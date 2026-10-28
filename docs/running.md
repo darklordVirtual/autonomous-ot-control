@@ -23,6 +23,37 @@ python -m runner.baseline --run-id local-1 --out artifacts
 python -m runner.areas --seeds 177 178 179 --out artifacts/areas-2025
 ```
 
+### Pilot evidence pack (calibrated building, ADR-011)
+
+Every strategy on the twin calibrated to the measured office `SITE_001`
+(`site-001-v3`, its plant sized from the design heat load),
+three seeds, priced on Elvia's published 2026 sheets and on the fixture's
+reference tariff, with the peak budget at 60 kW for `P3pb`; the BACS
+function audit cross-checked against the pack. About 30 minutes on two
+cores (fifteen year-long runs).
+
+```bash
+python -m runner.pilot --config twin/fixtures/calibrated/site-001-v3.json --area NO1 \
+    --seeds 177 178 179 --strategies P0 P1 P2 P3 P3pb --peak-budget-kw 60 \
+    --monthly-check docs/results/2026-10-28/pilot-site-001/monthly-check-v3.json \
+    --out artifacts/pilot-site-001
+python -m runner.bacs --savings artifacts/pilot-site-001/pilot.json --out artifacts/pilot-site-001
+python -m runner.report_pilot --results artifacts/pilot-site-001/pilot.json --out artifacts/pilot-site-001   # rebuild md/html
+```
+
+The same on the site's own metered period (2026-02-16..2026-10-26, the
+scenario the calibration was fitted on):
+
+```bash
+python -m runner.pilot --config twin/fixtures/calibrated/site-001-v3.json --area NO1 \
+    --scenario scenarios/no1-2026-metered-period-hvac-v1.json --seeds 177 \
+    --strategies P0 P1 P3 P3pb --peak-budget-kw 60 --out artifacts/pilot-site-001-metered
+```
+
+`--tariffs` names registry tariffs (`runner/tariffs.py`); the first is the
+primary and the runs are priced under every one. `runner.areas` takes the
+same `--tariff` to price a five-area run on a published sheet.
+
 ## Governed acceptance suite and demo (REMORA in the loop)
 
 ```bash

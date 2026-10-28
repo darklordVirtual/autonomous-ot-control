@@ -35,11 +35,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics as st
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
 
 UTC = timezone.utc
 #: Audit windows excluded from fitting (UTC, inclusive start, exclusive end).
@@ -381,12 +384,74 @@ def render_md(t: dict[str, Any]) -> str:
     return "\n".join(L) + "\n"
 
 
+def _monthly_stats(pairs: list[tuple[float, float]]) -> dict[str, Any]:
+    """Guideline 14 monthly CV(RMSE) and NMBE over (measured, simulated) month totals."""
+    n = len(pairs)
+    if n < 3:
+        return {"months": n, "monthly_cv_rmse_pct": None, "monthly_nmbe_pct": None, "guideline14_monthly": False}
+    mean = sum(a for a, _ in pairs) / n
+    cv = 100 * math.sqrt(sum((a - b) ** 2 for a, b in pairs) / (n - 1)) / mean
+    nmbe = 100 * sum(a - b for a, b in pairs) / ((n - 1) * mean)
+    return {"months": n, "monthly_cv_rmse_pct": round(cv, 1), "monthly_nmbe_pct": round(nmbe, 1),
+            "guideline14_monthly": cv <= 15.0 and abs(nmbe) <= 5.0}
+
+
+def monthly_check(fixture: Path, calibration: Path, reference_fixture: Path | None = None) -> dict[str, Any]:
+    """Monthly comparison of a fixture against the measured months in a site calibration file.
+
+    The calibration file carries, per meter group, each month's measured total and the fitted
+    fixture's total over the hours both had. A derived fixture (plant sized differently, say) is
+    checked here without the hourly export: it is run on the calibration's scenario, and its
+    whole-month totals are scaled to the measured hours by the reference fixture's ratio of
+    gated to whole-month totals, so the comparison is on the same hours. In-sample, like the fit."""
+    cal = json.loads(calibration.read_text("utf-8"))
+    fit = cal["fit"]
+    scenario = ROOT / fit["scenario"]
+    if not scenario.exists():
+        scenario = ROOT / "scenarios" / Path(fit["scenario"]).name
+    ref = reference_fixture or ROOT / fit["fixtures"][0]
+    runs = {name: twin_targets(fx, scenario=scenario) for name, fx in (("ref", ref), ("new", fixture))}
+    groups = {"total": ("TENANT", "TECHNICAL"), "E01_vs_tenant": ("TENANT",), "E02_vs_technical": ("TECHNICAL",)}
+    out: dict[str, Any] = {"schema": "ot-monthly-check/v1", "fixture": fixture.name, "reference": ref.name,
+                           "scenario": scenario.name, "calibration": calibration.name, "groups": {}}
+    for key, parts in groups.items():
+        val = fit["validation"][key]
+        by_month = val["by_month_kwh"]
+        rows = {}
+        pairs = []
+        for month, (measured, ref_gated) in by_month.items():
+            whole = {n: sum(v for g in parts for h, v in r["hourly_group_kwh"][g].items() if h.startswith(month))
+                     for n, r in runs.items()}
+            ratio = ref_gated / whole["ref"] if whole["ref"] else 1.0
+            new_gated = whole["new"] * ratio
+            rows[month] = {"measured": round(measured), "reference_gated": round(ref_gated),
+                           "new_whole_month": round(whole["new"]), "new_gated": round(new_gated), "gating_ratio": round(ratio, 4)}
+            pairs.append((measured, new_gated))
+        out["groups"][key] = {"by_month": rows, **_monthly_stats(pairs),
+                              "reference": {k: val.get(k) for k in ("monthly_cv_rmse_pct", "monthly_nmbe_pct", "guideline14_monthly")}}
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="runner.site_calibration")
-    p.add_argument("--data", required=True, help="the extracted anonymised export (manifest.json, meters/)")
-    p.add_argument("--weather", required=True, help="an ot-exogenous-snapshot outdoor file covering the period")
+    p.add_argument("--data", help="the extracted anonymised export (manifest.json, meters/)")
+    p.add_argument("--weather", help="an ot-exogenous-snapshot outdoor file covering the period")
+    p.add_argument("--monthly-check", help="a fixture to compare month by month against --calibration (no export needed)")
+    p.add_argument("--calibration", help="the site calibration file (scenarios/calibration/<site>.json)")
     p.add_argument("--out", required=True)
     a = p.parse_args(argv)
+    if a.monthly_check:
+        res = monthly_check(Path(a.monthly_check), Path(a.calibration))
+        out = Path(a.out)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "monthly-check.json").write_text(json.dumps(res, indent=2) + "\n", "utf-8")
+        for key, g in res["groups"].items():
+            print(f"{key:18} new: CV(RMSE) {g['monthly_cv_rmse_pct']} % NMBE {g['monthly_nmbe_pct']} % "
+                  f"({'met' if g['guideline14_monthly'] else 'not met'})  reference: CV {g['reference']['monthly_cv_rmse_pct']} % "
+                  f"NMBE {g['reference']['monthly_nmbe_pct']} %")
+        return 0
+    if not (a.data and a.weather):
+        p.error("--data and --weather, or --monthly-check with --calibration")
     t = targets(Path(a.data), Path(a.weather))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

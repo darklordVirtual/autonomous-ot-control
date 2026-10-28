@@ -116,6 +116,10 @@ class PlantConfig:
     # Constant auxiliary electricity not modelled as a process: circulation and energy-well pumps,
     # electric domestic hot water. 0 for every earlier fixture.
     aux_electric_w: float = 0.0
+    # Ground-source heat pump: a constant source temperature (brine from energy wells) replaces the
+    # outdoor air as the evaporator source, and the capacity does not fall with the outdoor
+    # temperature. None = air-to-water (the default for every earlier fixture).
+    hp_source_c: float | None = None
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "PlantConfig":
@@ -145,6 +149,7 @@ class PlantConfig:
                 cables=tuple((c["circuit"], float(c["rated_w"])) for c in d.get("cables", [])),
                 free_cooling_eer=(float(d["free_cooling_eer"]) if d.get("free_cooling_eer") is not None else None),
                 aux_electric_w=float(d.get("aux_electric_w", 0.0)),
+                hp_source_c=(float(d["hp_source_c"]) if d.get("hp_source_c") is not None else None),
             )
         except (KeyError, TypeError) as e:
             raise PlantError(f"plant config: {e}") from None
@@ -156,6 +161,8 @@ class PlantConfig:
                 raise PlantError(f"{name} must be in (0, 1]")
         if cfg.free_cooling_eer is not None and not 1.0 <= cfg.free_cooling_eer <= 60.0:
             raise PlantError("free_cooling_eer must be in [1, 60] (pumps only; an EER, not a fraction)")
+        if cfg.hp_source_c is not None and not -10.0 <= cfg.hp_source_c <= 25.0:
+            raise PlantError("hp_source_c must be in [-10, 25] degC (a brine or ground-loop temperature)")
         return cfg
 
 
@@ -394,8 +401,8 @@ def step(cfg: PlantConfig, state: PlantState, zone_temp_c: dict[str, float],
         # High-pressure cut-out: the compressor stops whatever the setpoint says
         # once the tank passes the maximum supply temperature plus 5 K.
         cutout = state.tank_c >= cfg.hp_max_supply_c + 5.0
-        can_run = (exo.outdoor_c >= cfg.hp_min_outdoor_c and sp.hp_max_fraction > 0
-                   and not cutout)
+        can_run = ((cfg.hp_source_c is not None or exo.outdoor_c >= cfg.hp_min_outdoor_c)
+                   and sp.hp_max_fraction > 0 and not cutout)
         pts["HP-01.HighPressureCutout"] = 1.0 if cutout else 0.0
         if hp_on and (not want_on or not can_run) and (state.hp_state_since_s >= cfg.hp_min_run_s
                                                         or not can_run):
@@ -403,11 +410,13 @@ def step(cfg: PlantConfig, state: PlantState, zone_temp_c: dict[str, float],
         elif not hp_on and want_on and can_run and state.hp_state_since_s >= cfg.hp_min_stop_s:
             hp_on, since, starts = True, dt, starts + 1
         if hp_on:
-            cap = heat_pump_capacity_w(cfg.hp_nominal_heat_w, exo.outdoor_c) * sp.hp_max_fraction
-            cop = heat_pump_cop(exo.outdoor_c, min(sp.tank_c, cfg.hp_max_supply_c),
-                                cfg.hp_carnot_fraction)
+            ground = cfg.hp_source_c is not None
+            source_c = cfg.hp_source_c if ground else exo.outdoor_c
+            cap = (cfg.hp_nominal_heat_w if ground
+                   else heat_pump_capacity_w(cfg.hp_nominal_heat_w, exo.outdoor_c)) * sp.hp_max_fraction
+            cop = heat_pump_cop(source_c, min(sp.tank_c, cfg.hp_max_supply_c), cfg.hp_carnot_fraction)
             lo, hi = cfg.hp_defrost_band_c
-            if lo <= exo.outdoor_c <= hi and exo.outdoor_rh_pct >= cfg.hp_defrost_rh_pct:
+            if not ground and lo <= exo.outdoor_c <= hi and exo.outdoor_rh_pct >= cfg.hp_defrost_rh_pct:
                 cap *= 1.0 - cfg.hp_defrost_penalty
                 cop *= 1.0 - cfg.hp_defrost_penalty
                 pts["HP-01.Defrost"] = 1.0

@@ -198,3 +198,49 @@ metered energy (the sheet's `MÅLEBEHOV`), with a held-out validation period
 and MAE/RMSE on temperature and energy. A pilot building's meters are the
 next source, not more certificates. Until then every savings figure is a
 property of a building built from priors.
+
+## The plant, sized from the design heat load (v3)
+
+`build_fixture` sets the heat pump's nominal output to the certificate's
+installed heating capacity, which is the radiators: on SITE_001 a 463 kW
+pump that drew about 150 kW electric in a January recovery, while the
+site's meters show weekday daytime medians near 30 kW. The monthly energy
+was right and the peaks were not. `site-001-v3` is `v2` with the heat
+source sized from the design heat load instead (`runner.calibration
+size-plant`, ADR-011): design load 106 kW at −20 °C (transmission UA plus
+ventilation with the certificate's heat recovery); heat pump 58 kW (55 %
+of the design load, which a ground-source pump covering the certificate's
+87 % of the heating energy would have); backup heater 48 kW (the rest, the
+certificate's direct-electric share); a ground-source pump at a constant
+4 °C (`hp_source_c`, new in the plant: no outdoor derating, no defrost);
+the Carnot fraction 0.609 so that the pump reaches the certificate's
+seasonal COP 4.28 at a 40 °C mean supply; a buffer of 25 l per kW, 1 456 l.
+Every value and its assumption is in the fixture's
+`calibration.plant_sizing`. None is measured.
+
+Checked month by month against the site's measured months, without the
+hourly export (`python -m runner.site_calibration --monthly-check
+twin/fixtures/calibrated/site-001-v3.json --calibration
+scenarios/calibration/site-001.json`; the v3 whole-month totals are scaled
+to the measured hours by v2's gated-to-whole ratio, so the comparison is on
+the same hours; in-sample like the fit):
+
+| | v3 monthly CV(RMSE) | v3 NMBE | v2 | Guideline 14 monthly |
+|---|---:|---:|---|---|
+| Total, E01 + E02 | 12.2 % | 0.0 % | 11.8 % / −0.7 % | met |
+| E01 against tenant load | 12.1 % | 0.2 % | 12.1 % / 0.2 % | met |
+| E02 against technical load | 19.1 % | −0.4 % | 18.0 % / −2.4 % | not met |
+
+The January P0 peak is 105 kW and it is the backup heater, which is what
+the direct-electric share says it should be. The site's own winter hourly
+maxima are the next thing to measure: they decide the plant's real size.
+
+## Savings on the calibrated building
+
+The strategies run on `site-001-v3` with the peak budget, the seed ranges,
+the tariff sensitivity and the SHA-256 of every input are in the pilot
+evidence pack, `docs/results/2026-10-28/pilot-site-001/` (ADR-011). It is
+a calibrated simulation in the sense of IPMVP Option D, with the
+limitations above carried into its scope section: in-sample, monthly,
+nine months of 2026 for a savings year of 2025, and the testbed's generic
+as-found control as P0.

@@ -107,6 +107,14 @@ def test_the_committed_calibrated_fixtures_rebuild_byte_for_byte():
             rebuilt = cal.build_fixture(p, building_id=cfg["building_id"], source=src)
             assert {"bra_m2", "equipment_base_w_per_m2", "lighting_w_per_m2", "equipment_w_per_m2"} <= set(p)
             assert cfg["plant"]["cables"] == []
+            ps = cfg["calibration"].get("plant_sizing")
+            if ps:
+                # The plant sized from the design heat load (ADR-011) rebuilds from the fixture it derives from.
+                base = json.loads((folder / f"{ps['derived_from']}.json").read_text("utf-8"))
+                rebuilt = cal.size_plant(base, hp_share=ps["hp_share_of_design_load"], dut_c=ps["dut_c"],
+                                         hp_source_c=ps["hp_source_c"], seasonal_cop=ps["seasonal_cop"],
+                                         supply_mean_c=ps["supply_mean_c"], tank_l_per_kw=ps["tank_l_per_kw"],
+                                         building_id=cfg["building_id"])
         else:
             rebuilt = cal.build_from_building(PRIORS, src["id"], building_id=cfg["building_id"])
         assert rebuilt == cfg, f.name

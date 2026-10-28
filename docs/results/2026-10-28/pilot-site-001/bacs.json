@@ -1,0 +1,481 @@
+{
+  "schema": "ot-bacs-audit/v1",
+  "standard": "EN ISO 52120-1:2022 (EN 15232-1:2017)",
+  "transcription": "Function names, levels and class thresholds are transcribed from the standard's structure, not quoted from a licensed copy; verify against the standard before any contractual or regulatory use. The formal class is assigned by an assessor over the installed equipment.",
+  "functions": [
+    {
+      "id": "1.1",
+      "domain": "heating",
+      "name": "Emission control (room temperature)",
+      "levels": {
+        "0": "no automatic control",
+        "1": "central automatic control",
+        "2": "individual room control",
+        "3": "individual room control with communication",
+        "4": "with communication and presence detection"
+      },
+      "class_min": {
+        "C": 2,
+        "B": 3,
+        "A": 4
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: one scheduled setpoint for every zone (runner.baseline)",
+      "p3_level": 3,
+      "p3_evidence": "per-zone heating setpoint written and read back through the governed tools (`set_zone_setpoint`, `ZONE-0x.AirTemp`); no presence sensor in the twin, so not level 4",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "D",
+      "p3_grade": "B"
+    },
+    {
+      "id": "1.3",
+      "domain": "heating",
+      "name": "Control of distribution network hot-water temperature",
+      "levels": {
+        "0": "no automatic control",
+        "1": "outside temperature compensated",
+        "2": "demand based"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 2
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: tank fixed at 50 degC (strategies.py)",
+      "p3_level": 2,
+      "p3_evidence": "weather-reset tank following the radiator curve, demand-held on price and peak (`weather_reset`, `price_ranked_charge`, `set_tank_setpoint`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "D",
+      "p3_grade": "A"
+    },
+    {
+      "id": "1.5",
+      "domain": "heating",
+      "name": "Intermittent control of emission and/or distribution",
+      "levels": {
+        "0": "no automatic control",
+        "1": "automatic with fixed time program",
+        "2": "automatic with optimum start/stop",
+        "3": "automatic with demand evaluation"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 3
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: fixed 1 h preheat and schedule",
+      "p3_level": 3,
+      "p3_evidence": "self-tuning optimal start (`ReheatLearner`), recovery-limited setback by outdoor mean, occupancy horizon (`optimal_start`, `recovery_setback`, `setback`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "C",
+      "p3_grade": "A"
+    },
+    {
+      "id": "1.7",
+      "domain": "heating",
+      "name": "Heat-pump generator control",
+      "levels": {
+        "0": "constant temperature",
+        "1": "variable temperature by outdoor temperature",
+        "2": "variable temperature by load"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 2
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: fixed tank setpoint",
+      "p3_level": 2,
+      "p3_evidence": "tank setpoint from the weather curve plus demand hold; compressor cap for the peak budget (`set_heat_pump_limit`, ADR-011)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "D",
+      "p3_grade": "A"
+    },
+    {
+      "id": "1.10",
+      "domain": "heating",
+      "name": "Thermal energy storage control",
+      "levels": {
+        "0": "continuous storage operation",
+        "1": "two-sensor charging",
+        "2": "load-prediction based charging"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 1,
+        "A": 2
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: tank charged on hysteresis only",
+      "p3_level": 2,
+      "p3_evidence": "charging ranked by the day-ahead price and held before a peak block (`price_ranked_charge`)",
+      "applicable": true,
+      "note": "The twin's price-ranked charging is prediction-based on the published day-ahead price, not on a load forecast.",
+      "p0_grade": "D",
+      "p3_grade": "A"
+    },
+    {
+      "id": "3.1",
+      "domain": "cooling",
+      "name": "Emission control (room temperature)",
+      "levels": {
+        "0": "no automatic control",
+        "1": "central automatic control",
+        "2": "individual room control",
+        "3": "individual room control with communication",
+        "4": "with communication and presence detection"
+      },
+      "class_min": {
+        "C": 2,
+        "B": 3,
+        "A": 4
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: one cooling setpoint",
+      "p3_level": 3,
+      "p3_evidence": "per-zone cooling setpoint through `set_zone_cooling_setpoint`, unoccupied setback (`unoccupied_cooling_setback`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "D",
+      "p3_grade": "B"
+    },
+    {
+      "id": "3.6",
+      "domain": "cooling",
+      "name": "Interlock between heating and cooling",
+      "levels": {
+        "0": "no interlock",
+        "1": "partial interlock",
+        "2": "total interlock"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 2
+      },
+      "p0_level": 2,
+      "p0_evidence": "IL-01: the twin refuses a cooling setpoint within 2 K of heating",
+      "p3_level": 2,
+      "p3_evidence": "IL-01 held by the twin, the signed ToolSpec and the caretaker's validator",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "A",
+      "p3_grade": "A"
+    },
+    {
+      "id": "4.1",
+      "domain": "ventilation",
+      "name": "Supply-air flow control at room level",
+      "levels": {
+        "0": "no automatic control",
+        "1": "time control",
+        "2": "presence control",
+        "3": "demand control (air quality)"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 3
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: fixed AHU schedule",
+      "p3_level": 3,
+      "p3_evidence": "DCV on CO2 in every zone (`ZONE-0x.CO2Setpoint`, `set_zone_co2_setpoint`), IAQ overlay keeps the AHU on above 950 ppm",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "C",
+      "p3_grade": "A"
+    },
+    {
+      "id": "4.3",
+      "domain": "ventilation",
+      "name": "Heat-exchanger icing protection",
+      "levels": {
+        "0": "without",
+        "1": "with"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 1,
+        "A": 1
+      },
+      "p0_level": 1,
+      "p0_evidence": "twin: HRV frost limit (`hrv_frost_limit_c`)",
+      "p3_level": 1,
+      "p3_evidence": "same (plant function, not a caretaker lever)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "A",
+      "p3_grade": "A"
+    },
+    {
+      "id": "4.5",
+      "domain": "ventilation",
+      "name": "Free mechanical cooling",
+      "levels": {
+        "0": "no automatic control",
+        "1": "night cooling",
+        "2": "free cooling (modulated)",
+        "3": "h,x-directed control"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 2
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: none",
+      "p3_level": 1,
+      "p3_evidence": "summer night purge through the HRV bypass (`night_purge`); the twin has no modulated free-cooling damper",
+      "applicable": true,
+      "note": "Free cooling from the energy wells (`free_cooling_eer`) is a plant property of SITE_001, not a controlled function.",
+      "p0_grade": "D",
+      "p3_grade": "C"
+    },
+    {
+      "id": "4.6",
+      "domain": "ventilation",
+      "name": "Supply-air temperature control",
+      "levels": {
+        "0": "no automatic control",
+        "1": "constant setpoint",
+        "2": "variable setpoint by outdoor temperature",
+        "3": "variable setpoint by load"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 3
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: fixed supply-air setpoint",
+      "p3_level": 3,
+      "p3_evidence": "Trim & Respond on zone requests outside the heating season (`trim_respond`, `set_supply_air_setpoint`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "C",
+      "p3_grade": "A"
+    },
+    {
+      "id": "5.1",
+      "domain": "lighting",
+      "name": "Occupancy control",
+      "levels": {
+        "0": "manual on/off",
+        "1": "manual on/off plus extended-off signal",
+        "2": "automatic detection, auto on / dimmed",
+        "3": "automatic detection, auto on / auto off",
+        "4": "manual on / dimmed",
+        "5": "manual on / auto off"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 3
+      },
+      "p0_level": 1,
+      "p0_evidence": "P0: lighting on the schedule (`schedule` mode)",
+      "p3_level": 3,
+      "p3_evidence": "presence mode: lit while people are present, off when they leave (`set_zone_lighting_mode`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "C",
+      "p3_grade": "A"
+    },
+    {
+      "id": "5.2",
+      "domain": "lighting",
+      "name": "Daylight control",
+      "levels": {
+        "0": "manual",
+        "1": "automatic (dimming or switching)"
+      },
+      "class_min": {
+        "C": 0,
+        "B": 1,
+        "A": 1
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: no daylight dimming",
+      "p3_level": 1,
+      "p3_evidence": "daylight harvesting to the lux setpoint (`daylight_harvesting`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "C",
+      "p3_grade": "A"
+    },
+    {
+      "id": "7.3",
+      "domain": "tbm",
+      "name": "Detecting faults of technical building systems and support to diagnosis",
+      "levels": {
+        "0": "no",
+        "1": "with central reporting of faults"
+      },
+      "class_min": {
+        "C": 0,
+        "B": 0,
+        "A": 1
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: none",
+      "p3_level": 1,
+      "p3_evidence": "zone-sensor FDD: stale, frozen, drifted, mis-mapped readings alarmed with evidence and ground truth (`fdd-alarms.jsonl`); escalation route to a human",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "B",
+      "p3_grade": "A"
+    },
+    {
+      "id": "7.4",
+      "domain": "tbm",
+      "name": "Reporting energy consumption, indoor conditions and possibilities for improvement",
+      "levels": {
+        "0": "no",
+        "1": "with"
+      },
+      "class_min": {
+        "C": 0,
+        "B": 0,
+        "A": 1
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: none",
+      "p3_level": 1,
+      "p3_evidence": "every decision record carries context, algorithms and validation; energy by consumer, comfort, IAQ and tank safety reported per day (`runner.areas`, `runner.pilot`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "B",
+      "p3_grade": "A"
+    },
+    {
+      "id": "7.5",
+      "domain": "tbm",
+      "name": "Smart-grid integration (demand response)",
+      "levels": {
+        "0": "no",
+        "1": "with"
+      },
+      "class_min": {
+        "C": 0,
+        "B": 0,
+        "A": 1
+      },
+      "p0_level": 0,
+      "p0_evidence": "P0: none",
+      "p3_level": 1,
+      "p3_evidence": "demand-response profile on the day-ahead price, peak limiter and monthly peak budget on the grid tariff's power part (`demand_response`, `peak_limiter`, `peak_budget`)",
+      "applicable": true,
+      "note": "",
+      "p0_grade": "B",
+      "p3_grade": "A"
+    },
+    {
+      "id": "2.1",
+      "domain": "dhw",
+      "name": "Domestic hot-water storage control",
+      "levels": {
+        "0": "automatic on/off",
+        "1": "with time scheduling",
+        "2": "with demand or multi-sensor control"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 2
+      },
+      "p0_level": 0,
+      "p0_evidence": "n/a",
+      "p3_level": 0,
+      "p3_evidence": "n/a",
+      "applicable": false,
+      "note": "The twin has no domestic hot water; SITE_001's electric hot water is a constant auxiliary load. A site with DHW adds a water-safety overlay before any energy function.",
+      "p0_grade": null,
+      "p3_grade": null
+    },
+    {
+      "id": "6.1",
+      "domain": "blinds",
+      "name": "Blind control",
+      "levels": {
+        "0": "manual",
+        "1": "motorized, manual",
+        "2": "motorized, automatic",
+        "3": "combined light/blind/HVAC control"
+      },
+      "class_min": {
+        "C": 1,
+        "B": 2,
+        "A": 3
+      },
+      "p0_level": 0,
+      "p0_evidence": "n/a",
+      "p3_level": 0,
+      "p3_evidence": "n/a",
+      "applicable": false,
+      "note": "No blinds in the twin.",
+      "p0_grade": null,
+      "p3_grade": null
+    }
+  ],
+  "overall_class_floor": {
+    "P0": "D",
+    "P3": "C"
+  },
+  "grade_counts": {
+    "P0": {
+      "D": 6,
+      "C": 5,
+      "B": 3,
+      "A": 2
+    },
+    "P3": {
+      "D": 0,
+      "C": 1,
+      "B": 2,
+      "A": 13
+    }
+  },
+  "office_bac_factors": {
+    "thermal": {
+      "D": 1.51,
+      "C": 1.0,
+      "B": 0.8,
+      "A": 0.7
+    },
+    "electrical": {
+      "D": 1.1,
+      "C": 1.0,
+      "B": 0.93,
+      "A": 0.87
+    }
+  },
+  "epbd": {
+    "directive": "Directive (EU) 2024/1275 (EPBD recast), Article 13",
+    "requirements": [
+      "non-residential buildings with heating, air-conditioning or combined systems of effective rated output over 290 kW: building automation and control systems (continuous monitoring, logging, analysis and adjustment; benchmarking against reference values; fault detection and alerting; interoperability)",
+      "the same for systems over 70 kW, by 31 December 2029"
+    ],
+    "note": "Norway's transposition through the EEA agreement is pending; the thresholds are given as the directive states them, as the market signal the caretaker's functions answer, not as a Norwegian legal requirement."
+  },
+  "reading": "The class floor is the lowest grade of any applicable function, which is how the standard assigns a class; a single function at a low level holds the whole building down. The grade counts show where the caretaker sits per function.",
+  "cross_check": {
+    "from_class": "C",
+    "to_class": "A",
+    "p0_thermal_kwh": 34766,
+    "p0_electrical_kwh": 60981,
+    "factor_thermal_saving_kwh": 10430,
+    "factor_electrical_saving_kwh": 7927,
+    "factor_saving_kwh": 18357,
+    "simulated_saving_kwh": 22229,
+    "ratio_simulated_to_factor": 1.21,
+    "reading": "The BAC factors are statistical defaults for a typical office in the standard's reference climate, not a prediction for this building; the simulated saving is one building on one year of weather. Agreement in order of magnitude is the check; a ratio far from 1 says the twin's as-found case or its levers differ from the standard's reference, and why should be stated."
+  }
+}

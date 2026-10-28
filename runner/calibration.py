@@ -237,6 +237,78 @@ def build_fixture(params: dict[str, Any], *, building_id: str, template: Path = 
     return cfg
 
 
+def size_plant(cfg: dict[str, Any], *, hp_share: float = 0.55, dut_c: float = -20.0, hp_source_c: float | None = 4.0,
+               seasonal_cop: float | None = None, supply_mean_c: float = 40.0, tank_l_per_kw: float = 25.0,
+               building_id: str | None = None) -> dict[str, Any]:
+    """Size the heat source from the building's design heat load instead of its installed radiators.
+
+    `build_fixture` sets the heat pump's nominal output to the installed heating capacity
+    (`heater_w_per_m2` x BRA, from the certificate), which is the radiators, not the heat pump. On
+    SITE_001 that gave a 463 kW heat pump drawing about 150 kW electric in a January recovery,
+    while the site's meters show weekday daytime medians near 30 kW: the twin's monthly energy was
+    right and its peaks were not. This sizes the plant from physics, each step stated:
+
+    - design heat load = transmission UA x (heating setpoint - DUT) + ventilation at the operating
+      airflow with the certificate's heat recovery;
+    - heat pump = `hp_share` of the design load (a pump covering ~55 % of the design load covers
+      ~85-90 % of the annual heating energy, the certificate's heat-pump share);
+    - backup heater = the rest of the design load (the certificate's direct-electric share);
+    - `hp_source_c`: a ground-source pump sees a constant brine temperature and no outdoor derating;
+    - `seasonal_cop`, when given, sets the Carnot fraction so that the pump reaches the certificate's
+      seasonal COP at `supply_mean_c`;
+    - buffer tank = `tank_l_per_kw` litres per kW of heat-pump output (common sizing practice).
+
+    Everything is written into the fixture's calibration block under `plant_sizing`.
+    """
+    out = copy.deepcopy(cfg)
+    pl = out["plant"]
+    bra = sum(z["area_m2"] for z in out["zones"])
+    ua = sum(z["ua_w_per_k"] for z in out["zones"])
+    heating_c = out["default_setpoints"]["zones"]["ZONE-01"]["heating_c"]
+    airflow_l_s = sum(pz["min_airflow_l_s_m2"] * pz["area_m2"] for pz in pl["zones"])
+    vent_w_per_k = airflow_l_s / 1000.0 * 1.2 * 1005.0 * (1.0 - float(pl["hrv_efficiency"]))
+    design_w = (ua + vent_w_per_k) * (heating_c - dut_c)
+    hp_w = round(hp_share * design_w, 0)
+    backup_w = round(design_w - hp_w, 0)
+    pl["hp_nominal_heat_w"] = hp_w
+    pl["backup_heater_w"] = backup_w
+    pl["tank_volume_l"] = round(max(500.0, tank_l_per_kw * hp_w / 1000.0), 0)
+    pl["hp_source_c"] = hp_source_c
+    carnot = None
+    if seasonal_cop is not None:
+        src = hp_source_c if hp_source_c is not None else 2.0
+        t_sink, t_source = supply_mean_c + 3.0 + 273.15, src - 6.0 + 273.15
+        carnot = round(seasonal_cop * max(t_sink - t_source, 5.0) / t_sink, 3)
+        pl["hp_carnot_fraction"] = carnot
+    if building_id:
+        out["building_id"] = building_id
+    cal = out.setdefault("calibration", {})
+    cal["plant_sizing"] = {
+        "schema": "ot-plant-sizing/v1",
+        "derived_from": cfg.get("building_id"),
+        "design_heat_load_w": round(design_w, 0),
+        "transmission_w_per_k": round(ua, 1), "ventilation_w_per_k": round(vent_w_per_k, 1),
+        "dut_c": dut_c, "heating_c": heating_c,
+        "hp_share_of_design_load": hp_share, "hp_nominal_heat_w": hp_w, "backup_heater_w": backup_w,
+        "hp_source_c": hp_source_c, "seasonal_cop": seasonal_cop, "supply_mean_c": supply_mean_c,
+        "hp_carnot_fraction": pl["hp_carnot_fraction"], "tank_l_per_kw": tank_l_per_kw,
+        "tank_volume_l": pl["tank_volume_l"], "bra_m2": bra,
+        "assumptions": [
+            "the heat pump's output is a share of the design heat load, not the installed radiator capacity",
+            "design heat load from transmission UA and ventilation with heat recovery at the certificate's "
+            "setpoint and the design outdoor temperature; no infiltration term beyond what UA carries",
+            "the backup heater is the rest of the design load (the certificate's direct-electric share)",
+            "a ground-source pump: constant source temperature, no outdoor derating, no defrost",
+            "the Carnot fraction reproduces the certificate's seasonal COP at the stated mean supply",
+            "buffer volume by litres per kW; the site's actual tank replaces it",
+            "none of these is measured; the pilot's phase 0 verifies each against the plant's documentation",
+        ],
+    }
+    out["comment"] = (cfg.get("comment", "") + " Plant sized from the design heat load (calibration.plant_sizing), "
+                      "not from the installed radiators.").strip()
+    return out
+
+
 def dominant_heat_source(p: dict[str, Any]) -> str:
     """The cohort's most common known heat source, mapped to the plant's; heat_pump only if that is it."""
     for src, _ in p["heat_sources"].items():
@@ -326,7 +398,27 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--out", required=True)
     c = sub.add_parser("check")
     c.add_argument("fixture")
+    sp_ = sub.add_parser("size-plant", help="derive a fixture with the heat source sized from the design heat load")
+    sp_.add_argument("--from", dest="src", required=True)
+    sp_.add_argument("--out", required=True)
+    sp_.add_argument("--building-id", default=None)
+    sp_.add_argument("--hp-share", type=float, default=0.55)
+    sp_.add_argument("--dut", type=float, default=-20.0)
+    sp_.add_argument("--hp-source-c", type=float, default=4.0, help="ground source brine temperature; -999 for air")
+    sp_.add_argument("--seasonal-cop", type=float, default=None)
+    sp_.add_argument("--supply-mean-c", type=float, default=40.0)
+    sp_.add_argument("--tank-l-per-kw", type=float, default=25.0)
     a = p.parse_args(argv)
+    if a.cmd == "size-plant":
+        cfg = size_plant(json.loads(Path(a.src).read_text("utf-8")), hp_share=a.hp_share, dut_c=a.dut,
+                         hp_source_c=None if a.hp_source_c == -999 else a.hp_source_c, seasonal_cop=a.seasonal_cop,
+                         supply_mean_c=a.supply_mean_c, tank_l_per_kw=a.tank_l_per_kw, building_id=a.building_id)
+        Path(a.out).write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+        ps = cfg["calibration"]["plant_sizing"]
+        print(f"{a.out}: design load {ps['design_heat_load_w'] / 1000:.0f} kW, heat pump {ps['hp_nominal_heat_w'] / 1000:.0f} kW, "
+              f"backup {ps['backup_heater_w'] / 1000:.0f} kW, tank {ps['tank_volume_l']:.0f} l, Carnot fraction "
+              f"{ps['hp_carnot_fraction']}, source {ps['hp_source_c']} degC")
+        return 0
     priors = load_priors()
     if a.cmd == "profiles":
         print(f"{'category':16s} {'size':8s} {'n':>4s} {'kWh/m2 p10':>10s} {'median':>7s} {'p90':>7s} {'BRA':>7s} "
