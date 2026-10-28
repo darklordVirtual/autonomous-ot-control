@@ -1,0 +1,237 @@
+{
+  "schema": "ot-monthly-check/v1",
+  "fixture": "site-001-v3.json",
+  "reference": "site-001-v2.json",
+  "scenario": "no1-2026-metered-period-hvac-v1.json",
+  "calibration": "site-001.json",
+  "groups": {
+    "total": {
+      "by_month": {
+        "2026-02": {
+          "measured": 9500,
+          "reference_gated": 9059,
+          "new_whole_month": 9580,
+          "new_gated": 8885,
+          "gating_ratio": 0.9275
+        },
+        "2026-03": {
+          "measured": 15886,
+          "reference_gated": 14734,
+          "new_whole_month": 17072,
+          "new_gated": 14594,
+          "gating_ratio": 0.8549
+        },
+        "2026-04": {
+          "measured": 13949,
+          "reference_gated": 13625,
+          "new_whole_month": 13514,
+          "new_gated": 13514,
+          "gating_ratio": 1.0
+        },
+        "2026-05": {
+          "measured": 12230,
+          "reference_gated": 12671,
+          "new_whole_month": 12665,
+          "new_gated": 12666,
+          "gating_ratio": 1.0
+        },
+        "2026-06": {
+          "measured": 12189,
+          "reference_gated": 13177,
+          "new_whole_month": 13177,
+          "new_gated": 13177,
+          "gating_ratio": 1.0
+        },
+        "2026-07": {
+          "measured": 10548,
+          "reference_gated": 13633,
+          "new_whole_month": 13633,
+          "new_gated": 13633,
+          "gating_ratio": 1.0
+        },
+        "2026-08": {
+          "measured": 12046,
+          "reference_gated": 13074,
+          "new_whole_month": 13074,
+          "new_gated": 13074,
+          "gating_ratio": 1.0
+        },
+        "2026-09": {
+          "measured": 14806,
+          "reference_gated": 12920,
+          "new_whole_month": 12854,
+          "new_gated": 12854,
+          "gating_ratio": 1.0
+        },
+        "2026-10": {
+          "measured": 13467,
+          "reference_gated": 12413,
+          "new_whole_month": 12247,
+          "new_gated": 12235,
+          "gating_ratio": 0.9991
+        }
+      },
+      "months": 9,
+      "monthly_cv_rmse_pct": 12.2,
+      "monthly_nmbe_pct": -0.0,
+      "guideline14_monthly": true,
+      "reference": {
+        "monthly_cv_rmse_pct": 11.8,
+        "monthly_nmbe_pct": -0.7,
+        "guideline14_monthly": true
+      }
+    },
+    "E01_vs_tenant": {
+      "by_month": {
+        "2026-02": {
+          "measured": 4493,
+          "reference_gated": 3893,
+          "new_whole_month": 4144,
+          "new_gated": 3893,
+          "gating_ratio": 0.9395
+        },
+        "2026-03": {
+          "measured": 8726,
+          "reference_gated": 8150,
+          "new_whole_month": 9508,
+          "new_gated": 8150,
+          "gating_ratio": 0.8571
+        },
+        "2026-04": {
+          "measured": 8391,
+          "reference_gated": 9018,
+          "new_whole_month": 9018,
+          "new_gated": 9018,
+          "gating_ratio": 1.0
+        },
+        "2026-05": {
+          "measured": 8644,
+          "reference_gated": 9065,
+          "new_whole_month": 9065,
+          "new_gated": 9065,
+          "gating_ratio": 1.0
+        },
+        "2026-06": {
+          "measured": 9743,
+          "reference_gated": 9398,
+          "new_whole_month": 9398,
+          "new_gated": 9398,
+          "gating_ratio": 1.0
+        },
+        "2026-07": {
+          "measured": 7735,
+          "reference_gated": 9704,
+          "new_whole_month": 9704,
+          "new_gated": 9704,
+          "gating_ratio": 1.0
+        },
+        "2026-08": {
+          "measured": 8795,
+          "reference_gated": 9360,
+          "new_whole_month": 9360,
+          "new_gated": 9360,
+          "gating_ratio": 1.0
+        },
+        "2026-09": {
+          "measured": 10864,
+          "reference_gated": 9322,
+          "new_whole_month": 9322,
+          "new_gated": 9322,
+          "gating_ratio": 1.0
+        },
+        "2026-10": {
+          "measured": 8557,
+          "reference_gated": 7902,
+          "new_whole_month": 7910,
+          "new_gated": 7902,
+          "gating_ratio": 0.999
+        }
+      },
+      "months": 9,
+      "monthly_cv_rmse_pct": 12.1,
+      "monthly_nmbe_pct": 0.2,
+      "guideline14_monthly": true,
+      "reference": {
+        "monthly_cv_rmse_pct": 12.1,
+        "monthly_nmbe_pct": 0.2,
+        "guideline14_monthly": true
+      }
+    },
+    "E02_vs_technical": {
+      "by_month": {
+        "2026-02": {
+          "measured": 5008,
+          "reference_gated": 5166,
+          "new_whole_month": 5436,
+          "new_gated": 4993,
+          "gating_ratio": 0.9186
+        },
+        "2026-03": {
+          "measured": 7160,
+          "reference_gated": 6584,
+          "new_whole_month": 7563,
+          "new_gated": 6445,
+          "gating_ratio": 0.8521
+        },
+        "2026-04": {
+          "measured": 5558,
+          "reference_gated": 4608,
+          "new_whole_month": 4497,
+          "new_gated": 4497,
+          "gating_ratio": 1.0001
+        },
+        "2026-05": {
+          "measured": 3586,
+          "reference_gated": 3606,
+          "new_whole_month": 3601,
+          "new_gated": 3601,
+          "gating_ratio": 0.9999
+        },
+        "2026-06": {
+          "measured": 2447,
+          "reference_gated": 3778,
+          "new_whole_month": 3778,
+          "new_gated": 3778,
+          "gating_ratio": 0.9999
+        },
+        "2026-07": {
+          "measured": 2813,
+          "reference_gated": 3928,
+          "new_whole_month": 3928,
+          "new_gated": 3928,
+          "gating_ratio": 0.9999
+        },
+        "2026-08": {
+          "measured": 3251,
+          "reference_gated": 3714,
+          "new_whole_month": 3714,
+          "new_gated": 3714,
+          "gating_ratio": 0.9999
+        },
+        "2026-09": {
+          "measured": 3942,
+          "reference_gated": 3598,
+          "new_whole_month": 3532,
+          "new_gated": 3532,
+          "gating_ratio": 1.0
+        },
+        "2026-10": {
+          "measured": 4910,
+          "reference_gated": 4512,
+          "new_whole_month": 4337,
+          "new_gated": 4334,
+          "gating_ratio": 0.9993
+        }
+      },
+      "months": 9,
+      "monthly_cv_rmse_pct": 19.1,
+      "monthly_nmbe_pct": -0.4,
+      "guideline14_monthly": false,
+      "reference": {
+        "monthly_cv_rmse_pct": 18.0,
+        "monthly_nmbe_pct": -2.4,
+        "guideline14_monthly": false
+      }
+    }
+  }
+}

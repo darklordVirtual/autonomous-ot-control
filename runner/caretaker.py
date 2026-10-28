@@ -138,6 +138,7 @@ class PeakBudget:
         self.min_fraction = float(cfg.get("min_fraction", 0.3))
         self.comfort_margin_k = float(cfg.get("comfort_margin_k", 0.3))
         self.tank_release_k = float(cfg.get("tank_release_k", 1.0))
+        self.backup_margin_k = float(cfg.get("backup_margin_k", 4.5))
         self.hp_full_kw = float(cfg.get("hp_full_kw_prior", 0.0)) or None
         self.alpha = float(cfg.get("learning_rate", 0.05))
         self.observations = 0
@@ -452,6 +453,8 @@ class Caretaker:
         algos: dict[str, str] = {}
         heating: dict[str, float] = {}
         frost = "frost_protection" in overlays
+        month = tw.clock.utc_at(t).strftime("%Y-%m")
+        budget_active = self.peak_budget.enabled and self.peak_budget.budget_kw(month) is not None
         for z in ZONES:
             reading = tel[z]["temp_c"]
             if tel[z]["suspect"]:
@@ -466,6 +469,17 @@ class Caretaker:
                 if to_occ is None or to_occ >= 10 * 3600:
                     tgt = pol["setback_floor_c"] if mean24 >= 0 else 17.0 if mean24 >= -5 else 18.0
                     algo = "recovery_setback"
+                    if budget_active:
+                        # Only as deep as the compressor can recover on its own before
+                        # occupancy (ADR-011): the learned reheat rate (observed under the
+                        # budget, so without the backup heater) over the longest optimal-start
+                        # lead, less its margin hour. A deeper setback would be paid back by
+                        # the backup heater at COP 1, in the hour that sets the month's peak.
+                        rate = self.learner.rate_for(z, out_c)
+                        recoverable = max(0.0, (12.0 - 1.0) * rate)
+                        floor = round(21.0 - recoverable, 1)
+                        if floor > tgt:
+                            tgt, algo = floor, "recovery_setback+budget"
                 if profile == "demand_response" and high_price:
                     tgt = max(pol["setback_floor_c"], tgt - 1.0)
                     algo = "dr_offset"
@@ -547,8 +561,6 @@ class Caretaker:
         # Under a peak budget the cheap-hour charge is skipped: a +5 K charge of the
         # buffer is one hour of high compressor power, exactly what the budget pays for
         # (ADR-011; the price shift was already a negative result on its own).
-        month = tw.clock.utc_at(t).strftime("%Y-%m")
-        budget_active = self.peak_budget.enabled and self.peak_budget.budget_kw(month) is not None
         curve_c = weather_compensated_supply_c(out_c)
         need = curve_c + 5.0
         base = min(55.0, max(45.0, need))
@@ -568,7 +580,11 @@ class Caretaker:
         # Peak budget (ADR-011): forward-looking, independent of the reactive limiter above.
         self._budget_ctx = None
         if budget_active:
-            other_kw = max(0.0, (tw.power_w - pts.get("HP-01.ElectricPower", 0.0)) / 1000)
+            # The rest of the building, without the heat pump and without the backup heater:
+            # a firing backup must not drive the cap to its floor (that would starve the tank
+            # further and keep the backup on); the backup is kept off by the setpoint below.
+            other_kw = max(0.0, (tw.power_w - pts.get("HP-01.ElectricPower", 0.0)
+                                 - pts.get("HP-01.BackupHeaterPower", 0.0)) / 1000)
             comfort_short = occupied and any(
                 not tel[z]["suspect"] and tel[z]["temp_c"] < pol["occupied_heating_min_c"] + self.peak_budget.comfort_margin_k
                 for z in ZONES)
@@ -577,9 +593,15 @@ class Caretaker:
             # optimal start sees the slower reheat and starts earlier.
             tank_short = tank < cur - 5.0 + self.peak_budget.tank_release_k
             budget = self.peak_budget.cap(month, other_kw)
-            if frost or comfort_short or tank_short:
+            released = "frost" if frost else "comfort" if comfort_short else "tank" if tank_short else None
+            if released:
+                # Comfort and safety before the tariff: the cap goes, and for frost or an
+                # occupied zone at the floor the setpoint goes back to the curve, so the
+                # backup heater may fire. A tank near the backup threshold releases the
+                # cap only; the setpoint keeps following the tank (below), which is what
+                # keeps the backup off when the compressor is already at full output.
                 cap, algos["heat_pump"] = 1.0, "peak_budget_released"
-                self._budget_ctx = {"released": "frost" if frost else "comfort" if comfort_short else "tank"}
+                self._budget_ctx = {"released": released}
             elif budget is not None:
                 cap_b, ctx = budget
                 if tank >= round(tank_sp, 2) - 2.0:           # IL-09: a cap only while the tank holds
@@ -595,16 +617,19 @@ class Caretaker:
                     cap, algos["heat_pump"] = cap_b, "peak_budget"
                 elif tw.setpoints.hp_max_fraction < 1.0:      # hold what is set
                     cap, algos["heat_pump"] = tw.setpoints.hp_max_fraction, "peak_budget_hold"
-                if cap < 1.0:
-                    # Ask the buffer for no more than the capped compressor can hold: the
-                    # setpoint follows the tank (+3 K, the charging hysteresis), within
-                    # IL-04's step, so neither the backup heater nor IL-09 fires because
-                    # the caretaker itself asked for heat the budget forbids. The lower
-                    # supply temperature is the throttle (supply = min(curve, tank)).
-                    follow = round(max(pol["tank_min_c"], min(tank_sp, tank + 3.0)), 2)
-                    tank_sp = round(max(cur - pol["tank_max_step_k"], follow), 2)
-                    algos["tank"] = algos["tank"] + "+budget_follow" if tank_sp < base else algos["tank"]
                 self._budget_ctx = ctx
+            if released in (None, "tank"):
+                # Ask the buffer for no more than the compressor can hold. The setpoint
+                # follows the tank: +3 K (the charging hysteresis) while a cap binds, and
+                # never more than backup_margin_k above the tank otherwise, so the resistive
+                # backup heater (at setpoint - 5 K, COP 1) never fires for a recovery the
+                # compressor can make on its own, only slower. Within IL-04's step. The
+                # lower supply temperature is the throttle (supply = min(curve, tank)).
+                lead = 3.0 if cap < 1.0 else self.peak_budget.backup_margin_k
+                follow = round(max(pol["tank_min_c"], min(tank_sp, tank + lead)), 2)
+                tank_sp = round(max(cur - pol["tank_max_step_k"], follow), 2)
+                if tank_sp < round(base, 2):
+                    algos["tank"] = algos["tank"] + "+budget_follow"
         algos["lighting"] = "presence_daylight"
         algos["cables"] = "ground_sensor"
         return Proposal(heating=heating, cooling=cooling, supply_air_c=round(sat, 2), tank_c=round(tank_sp, 2),

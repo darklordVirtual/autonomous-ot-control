@@ -3,7 +3,7 @@
 - Status: Accepted for the simulator. Not a physical-OT authorization. Not a measured saving.
 - Date: 2026-10-28
 - Related: ADR-005 (site data, savings, decision audit), ADR-007 (plant, tools, interlocks), ADR-009 (caretaker)
-- Code: `runner/caretaker.py` (`PeakBudget`), `runner/tariffs.py`, `runner/pilot.py`, `runner/report_pilot.py`, `runner/bacs.py`
+- Code: `runner/caretaker.py` (`PeakBudget`), `runner/calibration.py` (`size_plant`), `runner/site_calibration.py` (`monthly_check`), `twin/plant.py` (`hp_source_c`), `runner/tariffs.py`, `runner/pilot.py`, `runner/report_pilot.py`, `runner/peak_sweep.py`, `runner/report_demo.py`, `runner/bacs.py`
 - Policy: `deploy/ot/site_policy.v1.json` (`peak_budget`, `purge_max_chiller_eer`)
 
 ## Context
@@ -32,7 +32,19 @@ it:
    about 40, and the purge ran the fans at SFP 0.7 to displace it (P3 used
    3 000 kWh more fan energy than P2 over the summer, for 200 kWh less
    cooling).
-4. **The pilot conversation needs one document** that a building owner's
+4. **The twin's plant was sized from the radiators.** `build_fixture` sets
+   the heat pump's nominal output to the certificate's installed heating
+   capacity (130 W/m²), which is the radiators, not the pump: a 463 kW heat
+   pump that drew about 150 kW electric in a January recovery, on a site
+   whose meters show weekday daytime medians near 30 kW (`site_E01` +
+   `site_E02`). The monthly energy was right (the recovery is short) and the
+   peaks were not; a power-part saving computed on that plant would have
+   been an artefact. The first pack, on `site-001-v2` (three seeds, the
+   2026-07 sheet, a 70 kW budget), showed P3pb at 58 260 NOK (21.0 %,
+   seeds 20.2..21.8 %) a year, two thirds of it in the power part, with
+   winter peaks cut from 141 to 87 kW; it is recorded here and was not
+   published, because its plant is not the site's.
+5. **The pilot conversation needs one document** that a building owner's
    adviser can check: the baseline model and its calibration statistics,
    the strategies, the saving with its uncertainty and its drivers, the
    tariff it is priced on, the non-energy outcomes, and the digest of every
@@ -41,6 +53,22 @@ it:
 
 ## Decision
 
+0. **The plant is sized from the design heat load** (`runner.calibration
+   size-plant`, fixture `site-001-v3`): heat pump = 55 % of the design load
+   (a pump covering ~55 % of the design load covers ~85–90 % of the heating
+   energy, the certificate's 87 % heat-pump share), backup heater = the
+   rest (the certificate's direct-electric share), a ground-source pump
+   (constant brine temperature, no outdoor derating, no defrost: a new
+   optional `hp_source_c` in the plant), the Carnot fraction set to the
+   certificate's seasonal COP 4.28 at a 40 °C mean supply, and a buffer of
+   25 l per kW. Every value is written into the fixture's
+   `calibration.plant_sizing` with its assumptions. Checked month by month
+   against the site's measured months without the hourly export
+   (`runner.site_calibration --monthly-check`): total CV(RMSE) 12.2 %,
+   NMBE 0.0 % (v2: 11.8 %, −0.7 %), Guideline 14 monthly met; the technical
+   meter 19.1 % / −0.4 % (v2: 18.0 % / −2.4 %). The January peak is now
+   105 kW for P0 and it is the backup heater, which is what the
+   certificate's direct-electric share says it should be.
 1. **A forward-looking monthly peak budget** (`PeakBudget`, policy
    `peak_budget`, off by default). The site sets a budget in kW, one value
    or one per month. Each step the caretaker caps the compressor at
@@ -73,6 +101,19 @@ it:
    setpoint − 2 K, which is why the reactive limiter was ineffective.
 5. **No cheap-hour tank charge under a budget**; the weather-reset tank
    remains.
+5b. **Under a budget the heat pump recovers alone.** Where the backup
+   heater is the peak (SITE_001 as sized), capping the compressor does
+   nothing; what sets the month's peak is the resistive backup firing for a
+   recovery the compressor could make on its own, only slower. So under a
+   budget the buffer setpoint never sits more than `backup_margin_k` (4.5 K)
+   above the tank, the backup's threshold (setpoint − 5 K) is not reached by
+   the caretaker's own request, and the setback is only as deep as the
+   learned reheat rate recovers over the longest optimal-start lead
+   (`recovery_setback+budget`). A deeper setback would be paid back at
+   COP 1 in the hour that sets the peak. The comfort guard still restores
+   the curve, and so the backup, when an occupied zone reaches the floor.
+   The rest of the building's load, for the cap, excludes the backup heater,
+   so a firing backup cannot drive the cap to its floor and starve the tank.
 6. **The night purge runs only where it pays:** the chiller's observed EER
    (`CH-01.EER`, learned while cooling runs) must be at or below
    `purge_max_chiller_eer` (default 8). Energy wells at EER 40 never see a
@@ -103,26 +144,25 @@ it:
 
 ## Consequences
 
-- On `site-001-v2`, NO1 2025, Elvia's 2026 sheet, a 70 kW budget: see
+- On `site-001-v3`, NO1 2025, Elvia's 2026-07 sheet, a 60 kW budget: see
   `docs/results/2026-10-28/pilot-site-001/pilot.md` for the figures and the
-  seed ranges. Winter peaks fall from 130–166 kW to 80–91 kW; comfort
-  degree-hours, CO2 excess and tank hours are unchanged; the backup heater
-  never starts. The kWh saving is dominated by lighting (presence and
-  daylight) and the heat pump's better COP at the lower tank temperature;
-  the NOK saving is dominated by the power part.
-- The budget's value is a **site parameter**. The pack is run at one value.
-  A full-year sweep at 70, 80 and 90 kW (seed 177) gave 208 137, 209 673
-  and 214 347 NOK against P3's 243 815 and P0's 265 093: flat between 70
-  and 80, falling off above. A January-only sweep found 75 kW worse than
-  both 70 and 80 because it triggered comfort releases on the coldest
-  mornings, so the optimum is not smooth and a site sets its budget from
-  its measured peaks, its comfort floor and the grid company's tariff, and
-  can raise it at any time (a higher budget is a release, never a refusal).
-- What the budget assumes of the plant, stated in the pack's scope: that
-  the compressor can be capped to a fraction (staged or inverter-driven),
-  the buffer volume the fixture carries, and that the real heating
-  distribution follows a mixing curve as the twin's does. A pilot verifies
-  each with the site's documentation before the lever is enabled.
+  seed ranges. Seed 177 during development: P0 187 923 kWh, 244 557 NOK;
+  P3 −7.2 % kWh, −11.1 % NOK; P3pb −11.9 % kWh, −18.4 % NOK, the backup
+  heater 12 831 → 5 271 kWh, the winter peak mean 104 → 76 kW, with the
+  cold months (January, February) unchanged at about 104 kW because the
+  compressor cannot carry them and the comfort guard restores the backup.
+  Comfort degree-hours 44 a year for P3 and P3pb against 0 for P0 and P1.
+- On this plant the compressor cap almost never binds (3 steps a year):
+  the budget's value is the heat-pump-only recovery and the recoverable
+  setback, and the pack's sweep shows the number is insensitive to the
+  budget's kW. On a plant where the compressor is the peak (`site-001-v2`,
+  463 kW) the cap is the lever, and the same mode cut January from 160 to
+  94 kW. A site's measured peaks say which case it is.
+- What the sizing assumes, stated in the fixture and the pack's scope: the
+  heat pump's share of the design load, the backup heater's size and
+  staging rule, the buffer volume, the ground-source temperature and the
+  seasonal COP. None is measured; the pilot's phase 0 replaces each with
+  the plant's documentation and the meters' winter peaks.
 - Every earlier report is unchanged: the policy default is off, `P3` does
   not read the budget, and the only behaviour change to `P3` is the purge
   rule, which the fixture-declared chiller EER of the demo buildings (about

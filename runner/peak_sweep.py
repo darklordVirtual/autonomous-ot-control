@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--days", type=int, default=0)
     p.add_argument("--seed", type=int, default=177)
     p.add_argument("--budgets", type=float, nargs="+", default=[60, 70, 80, 90, 100])
-    p.add_argument("--hp-full-kw-prior", type=float, default=150.0)
+    p.add_argument("--hp-full-kw-prior", type=float, default=0.0, help="0: learn from the first running hour")
     p.add_argument("--tariff", default="elvia-stor-naering-lavspent-2026-07")
     p.add_argument("--workers", type=int, default=2)
     p.add_argument("--out", required=True)
@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
                          (a.area, "P3", a.seed, a.days, False, a.config, a.tariff, a.scenario, None)]
     for b in a.budgets:
         jobs.append((a.area, "P3pb", a.seed, a.days, False, a.config, a.tariff, a.scenario,
-                     {"peak_budget": {"kw": b, "hp_full_kw_prior": a.hp_full_kw_prior}}))
+                     {"peak_budget": {"kw": b, **({"hp_full_kw_prior": a.hp_full_kw_prior} if a.hp_full_kw_prior else {})}}))
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         runs = list(ex.map(run_one, jobs))
     tariff = get_tariff(a.tariff)

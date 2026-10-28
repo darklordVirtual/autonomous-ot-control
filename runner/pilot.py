@@ -153,7 +153,8 @@ def summarize(runs: list[dict[str, Any]], seeds: list[int], strategies: list[str
 def run_pack(config: Path, area: str, seeds: list[int], strategies: list[str], tariffs: list[str],
              peak_budget_kw: float | None, hp_full_kw_prior: float, days: int, workers: int,
              scenario: Path | None = None, faults: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    overrides = {"peak_budget": {"kw": peak_budget_kw, "hp_full_kw_prior": hp_full_kw_prior}} if peak_budget_kw else {}
+    overrides = ({"peak_budget": {"kw": peak_budget_kw, **({"hp_full_kw_prior": hp_full_kw_prior} if hp_full_kw_prior else {})}}
+                 if peak_budget_kw else {})
     jobs = [(area, s, sd, days, faults, str(config), tariffs[0], str(scenario) if scenario else None, overrides)
             for s in strategies for sd in seeds]
     with ProcessPoolExecutor(max_workers=workers) as ex:
@@ -162,7 +163,8 @@ def run_pack(config: Path, area: str, seeds: list[int], strategies: list[str], t
 
 
 def build_manifest(config: Path, area: str, scenario: Path, seeds: list[int], strategies: list[str],
-                   tariffs: list[str], overrides: dict[str, Any], argv: list[str]) -> dict[str, Any]:
+                   tariffs: list[str], overrides: dict[str, Any], argv: list[str],
+                   monthly_check: Path | None = None) -> dict[str, Any]:
     cfg = json.loads(config.read_text("utf-8"))
     sc = json.loads(scenario.read_text("utf-8"))
     inputs: dict[str, Any] = {
@@ -186,6 +188,8 @@ def build_manifest(config: Path, area: str, scenario: Path, seeds: list[int], st
         if calp.exists():
             inputs["calibration"] = {"site_id": site_id, "path": _rel(calp), "sha256": sha256_file(calp),
                                      "source_sha256": cal.get("source_sha256")}
+    if monthly_check:
+        inputs["monthly_check"] = {"path": _rel(monthly_check), "sha256": sha256_file(monthly_check)}
     return {"schema": SCHEMA + "/manifest", "created_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "testbed": git_head(), "python": platform.python_version(), "argv": argv,
             "area": area, "seeds": seeds, "strategies": strategies, "tariffs": tariffs,
@@ -197,14 +201,18 @@ def _rel(p: Path) -> str:
     return p.relative_to(ROOT).as_posix() if p.is_relative_to(ROOT) else str(p)
 
 
-def load_calibration(manifest: dict[str, Any]) -> dict[str, Any] | None:
+def load_calibration(manifest: dict[str, Any], config: Path, monthly_check: Path | None = None) -> dict[str, Any] | None:
     c = manifest["inputs"].get("calibration")
     if not c:
         return None
     raw = json.loads((ROOT / c["path"]).read_text("utf-8"))
     fit = raw.get("fit", {})
+    cfg = json.loads(config.read_text("utf-8"))
+    check = json.loads(monthly_check.read_text("utf-8")) if monthly_check else None
     return {"site_id": raw.get("site_id"), "note": raw.get("note"), "version": fit.get("version"),
             "validation": fit.get("validation"), "params": fit.get("params"),
+            "plant_sizing": (cfg.get("calibration") or {}).get("plant_sizing"),
+            "monthly_check": check,
             "certificate": {k: raw.get("certificate", {}).get(k) for k in
                             ("BRA_m2", "byggeaar", "heat_source_note", "heat_recovery_eff", "sfp_operating",
                              "measured_electricity_kwh_per_year", "calculated_delivered_kwh_m2")},
@@ -223,8 +231,10 @@ def main(argv: list[str] | None = None) -> int:
                    default=["elvia-stor-naering-lavspent-2026-07", "elvia-stor-naering-lavspent-2026-01", "reference-generic"],
                    choices=list(TARIFFS), help="the first is the primary; the runs are priced under every one")
     p.add_argument("--peak-budget-kw", type=float, default=None, help="monthly hourly-mean kW budget for P3pb")
-    p.add_argument("--hp-full-kw-prior", type=float, default=150.0)
+    p.add_argument("--hp-full-kw-prior", type=float, default=0.0, help="0: learn from the first running hour")
     p.add_argument("--primary", default="P3pb", help="the strategy the headline is written for")
+    p.add_argument("--monthly-check", default=None,
+                   help="runner.site_calibration --monthly-check output for a derived fixture, carried into the report")
     p.add_argument("--faults", action="store_true")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", required=True)
@@ -237,14 +247,17 @@ def main(argv: list[str] | None = None) -> int:
     runs, overrides = run_pack(config, a.area, a.seeds, a.strategies, a.tariffs, a.peak_budget_kw,
                                a.hp_full_kw_prior, a.days, a.workers, scenario if a.scenario else None, a.faults)
     summary = summarize(runs, a.seeds, a.strategies, a.tariffs)
-    manifest = build_manifest(config, a.area, scenario, a.seeds, a.strategies, a.tariffs, overrides, sys.argv[1:])
+    manifest = build_manifest(config, a.area, scenario, a.seeds, a.strategies, a.tariffs, overrides, sys.argv[1:],
+                              Path(a.monthly_check).resolve() if a.monthly_check else None)
     prim = summary["by_tariff"][a.tariffs[0]]
     res = {"schema": SCHEMA, "building_id": manifest["inputs"]["fixture"]["building_id"], "area": a.area,
            "area_name": AREAS[a.area], "scenario_id": manifest["inputs"]["scenario"]["scenario_id"],
            "days": len(runs[0]["days"]), "seeds": a.seeds, "strategies": a.strategies,
            "baseline": "P0", "primary": {"strategy": primary, "tariff": a.tariffs[0],
                                          "year": prim["strategies"], "monthly": prim["monthly"]},
-           "summary": summary, "calibration": load_calibration(manifest), "manifest": manifest,
+           "summary": summary,
+           "calibration": load_calibration(manifest, config, Path(a.monthly_check) if a.monthly_check else None),
+           "manifest": manifest,
            "tariff_in_runs": describe(json.loads(config.read_text("utf-8"))),
            "scope": SCOPE}
     out = Path(a.out)
@@ -307,8 +320,10 @@ SCOPE = {
         "monthly only (the hourly criterion is not met), and on nine months of 2026 while the savings year is 2025.",
         "The as-found control. P0 is the testbed's generic as-found sequence (fixed schedules, constant tank), not "
         "the site's documented sequence; the site's real baseline may already contain some of the levers.",
-        "Plant capability the levers assume: that the compressor can be capped to a fraction (peak budget), the "
-        "buffer volume and the control of lighting by presence and daylight in the real installation.",
+        "The plant as sized: the heat pump's output, the backup heater, the buffer volume and the ground-source "
+        "temperature are derived from the certificate and stated assumptions (calibration.plant_sizing), not "
+        "measured; whether the real plant stages its backup heater as the twin does, and whether lighting can be "
+        "controlled by presence and daylight, are site questions.",
         "The grid tariff's power part: priced on a published sheet, transcribed by hand, excluding taxes and the "
         "reactive-power charge; the site's contract may differ.",
         "Physical OT safety. No write path to a real plant exists (INV-12).",

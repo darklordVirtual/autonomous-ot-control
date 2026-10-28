@@ -63,6 +63,7 @@ def render_markdown(res: dict[str, Any]) -> str:
                 f"over {val.get('months')} metered months (Guideline 14 monthly "
                 f"{'met' if val.get('guideline14_monthly') else 'not met'}; hourly CV(RMSE) {val.get('cv_rmse_pct')} %, "
                 f"{'met' if val.get('guideline14_hourly') else 'not met'}). In-sample.", ""]
+    out += _plant_md(cal)
     out += ["## Strategies", "", "| Strategy | Cost (NOK) | Saving (NOK) | Saving (%) | kWh | Saving (kWh) | Winter peak (kW) | Comfort (dh) | Backup (kWh) |",
             "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for s in strategies:
@@ -118,6 +119,28 @@ def render_markdown(res: dict[str, Any]) -> str:
             f"- Seeds {m['seeds']}; created {m['created_utc']}", "",
             "Rebuild: `python -m runner.pilot " + " ".join(m["argv"]) + "`", ""]
     return "\n".join(out)
+
+
+def _plant_md(cal: dict[str, Any]) -> list[str]:
+    ps, mc = cal.get("plant_sizing"), cal.get("monthly_check")
+    out: list[str] = []
+    if ps:
+        out += [f"Plant sized from the design heat load ({_n(ps['design_heat_load_w'] / 1000)} kW at {ps['dut_c']} degC): "
+                f"heat pump {_n(ps['hp_nominal_heat_w'] / 1000)} kW ({int(100 * ps['hp_share_of_design_load'])} % of the design load), "
+                f"backup heater {_n(ps['backup_heater_w'] / 1000)} kW, buffer {_n(ps['tank_volume_l'])} l, ground source at "
+                f"{ps['hp_source_c']} degC, Carnot fraction {ps['hp_carnot_fraction']} (seasonal COP {ps['seasonal_cop']} at "
+                f"{ps['supply_mean_c']} degC supply). Derived from `{ps['derived_from']}`, whose heat pump was the installed "
+                f"radiator capacity; none of these values is measured.", ""]
+    if mc:
+        g = mc["groups"]
+        out += ["Monthly check of this fixture against the site's measured months (same hours as the fit, in-sample): "
+                + "; ".join(f"{k}: CV(RMSE) {v['monthly_cv_rmse_pct']} %, NMBE {v['monthly_nmbe_pct']} % "
+                            f"({'met' if v['guideline14_monthly'] else 'not met'})" for k, v in g.items()) + ".", ""]
+    return out
+
+
+def _plant_html(cal: dict[str, Any]) -> str:
+    return "".join(f"<p>{html.escape(line)}</p>" for line in _plant_md(cal) if line)
 
 
 # -- html ----------------------------------------------------------------------------------------
@@ -241,6 +264,7 @@ def render_html(res: dict[str, Any]) -> str:
                  f"NMBE <b class='{'ok' if ok else 'bad'}'>{val.get('monthly_nmbe_pct')} %</b> over {val.get('months')} metered months "
                  f"(Guideline 14 monthly {'met' if ok else 'not met'}); hourly CV(RMSE) {val.get('cv_rmse_pct')} % "
                  f"({'met' if val.get('guideline14_hourly') else 'not met'}). In-sample: the fit period is the validation period.</p>")
+    h.append(_plant_html(cal))
     h.append("<h2>What drives the number</h2><p>Energy by consumer, P0 to " + esc(ps) + " (kWh " + _period(res) + "). The bars after P0 are what each consumer saved; a red bar is a consumer that used more.</p>")
     h.append(_waterfall(y[base]["kwh"], levers, ps))
     parts = r["saving_by_part_nok"]

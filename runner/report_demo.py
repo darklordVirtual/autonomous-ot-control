@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from runner.report_pilot import CSS, STRATEGY_NAMES
+from runner.report_pilot import CSS, STRATEGY_NAMES, _n
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,7 +24,7 @@ JS = r"""
 const D = window.__DEMO__;
 const fmt = (v, d=0) => (v==null? '–' : Number(v).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d}).replace(/,/g,' '));
 const pct = v => v==null? '–' : v.toFixed(1)+' %';
-const C = {P0:'#9aa5b1',P1:'#6b8fb3',P2:'#3f7fbf',P3:'#1f5fa8',P3pb:'#0b8a5a',budget:'#b9410f'};
+const C = {P0:'#9aa5b1',P1:'#6b8fb3',P2:'#3f7fbf',P3:'#1f5fa8',P3pb:'#0b8a5a',budget:'#b9410f',measured:'#9aa5b1',simulated:'#1f5fa8'};
 const MN = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 
 function bars(el, series, labels, unit, hline){
@@ -92,7 +92,6 @@ function renderCalibration(){
   const c=D.calibration; if(!c||!c.validation){document.getElementById('cal').style.display='none';return;}
   const v=c.validation.total, bm=v.by_month_kwh||{}; const months=Object.keys(bm).sort();
   bars(document.getElementById('cchart'), {measured:months.map(m=>bm[m][0]), simulated:months.map(m=>bm[m][1])}, months.map(m=>MN[+m.slice(5,7)-1]+' '+m.slice(2,4)), 'kWh');
-  document.querySelectorAll('#cchart .legend i').forEach((el,i)=>el.style.background=i?'#1f5fa8':'#9aa5b1');
   document.getElementById('ctext').innerHTML=`Site <b>${c.site_id}</b>: monthly CV(RMSE) <b>${v.monthly_cv_rmse_pct} %</b>, NMBE <b>${v.monthly_nmbe_pct} %</b> over ${v.months} months (Guideline 14 monthly ${v.guideline14_monthly?'<b class="ok">met</b>':'<b class="bad">not met</b>'}); hourly CV(RMSE) ${v.cv_rmse_pct} % (${v.guideline14_hourly?'met':'not met'}). Measured ${fmt(v.measured_kwh)} kWh, simulated ${fmt(v.simulated_kwh)} kWh on the hours both have. In-sample.`;
 }
 renderSweep(); renderDay(); renderCalibration();
@@ -144,10 +143,10 @@ input[type=range]{{width:100%}}.row{{display:flex;gap:16px;align-items:center;ma
 <h1>Governed autonomy, one calibrated building</h1>
 <p class='sub'>{esc(res['building_id'])} · {esc(res['area'])} {esc(res['area_name'])} · {res['days']} days · {len(res['seeds'])} seeds · priced on {esc(tariff['name'])} · simulation only, IPMVP Option D</p>
 <div class='kpis'>
-<div class='kpi'><b>{r['saving_nok']['mean']:,.0f} NOK</b><span>saved {'a year' if res['days'] >= 360 else 'over the period'} by {esc(STRATEGY_NAMES.get(ps, ps))} vs P0 ({r['saving_pct']['mean']:.1f} %; seeds {r['saving_nok']['min']:,.0f}..{r['saving_nok']['max']:,.0f})</span></div>
-<div class='kpi'><b>{r['saving_kwh']['mean']:,.0f} kWh</b><span>{r['saving_kwh_pct']['mean']:.1f} % of {y[base]['kwh']:,.0f} kWh</span></div>
-<div class='kpi'><b>−{r['peak_reduction_kw_winter_mean']:,.0f} kW</b><span>winter peak, {y[base]['peak_kw_winter_mean']:,.0f} → {r['peak_kw_winter_mean']:,.0f} kW; power part {y[base]['grid_power_nok']:,.0f} → {r['grid_power_nok']:,.0f} NOK</span></div>
-<div class='kpi'><b>{r['comfort_dh']:,.0f} dh</b><span>comfort degree-hours occupied (P0 {y[base]['comfort_dh']:,.0f}); backup {r['backup_heater']:,.0f} kWh; CO₂ excess {r['co2_excess_ppmh']:,.0f} ppm·h</span></div>
+<div class='kpi'><b>{_n(r['saving_nok']['mean'])} NOK</b><span>saved {'a year' if res['days'] >= 360 else 'over the period'} by {esc(STRATEGY_NAMES.get(ps, ps))} vs P0 ({r['saving_pct']['mean']:.1f} %; seeds {_n(r['saving_nok']['min'])}..{_n(r['saving_nok']['max'])})</span></div>
+<div class='kpi'><b>{_n(r['saving_kwh']['mean'])} kWh</b><span>{r['saving_kwh_pct']['mean']:.1f} % of {_n(y[base]['kwh'])} kWh</span></div>
+<div class='kpi'><b>−{_n(r['peak_reduction_kw_winter_mean'])} kW</b><span>winter peak, {_n(y[base]['peak_kw_winter_mean'])} → {_n(r['peak_kw_winter_mean'])} kW; power part {_n(y[base]['grid_power_nok'])} → {_n(r['grid_power_nok'])} NOK</span></div>
+<div class='kpi'><b>{_n(r['comfort_dh'])} dh</b><span>comfort degree-hours occupied (P0 {_n(y[base]['comfort_dh'])}); backup {_n(r['backup_heater'])} kWh; CO₂ excess {_n(r['co2_excess_ppmh'])} ppm·h</span></div>
 </div>
 <section id='sweep'><h2>Choose the budget</h2>
 <p>The grid tariff's power part is charged on the month's highest hourly mean. Move the budget: the caretaker caps the compressor so the hour stays under it and releases the cap only for comfort, frost or a tank near the backup heater. A budget that is too tight is released on the coldest mornings, and those hours set the peak.</p>
@@ -160,10 +159,10 @@ input[type=range]{{width:100%}}.row{{display:flex;gap:16px;align-items:center;ma
 </section>
 <section id='cal'><h2>The baseline model against the site's meters</h2><p id='ctext'></p><div id='cchart'></div></section>
 <h2>Governance</h2><ul>
-<li>{esc(ps)}: {ck.get('proposals', 0):,.0f} proposals per seed; routes {', '.join(f"{k} {v:,.0f}" for k, v in (ck.get('routes') or {}).items())}.</li>
-<li>Validator violations: {', '.join(f"{k} {v:,.0f}" for k, v in (ck.get('violations') or {}).items()) or 'none'}. Corrupted proposals caught: {ck.get('optimizer_faults_caught', 0):,.0f}.</li>
-<li>Peak budget: cap steps {(ck.get('algorithms') or {}).get('peak_budget', 0):,.0f}, held {(ck.get('algorithms') or {}).get('peak_budget_hold', 0):,.0f}, released {(ck.get('algorithms') or {}).get('peak_budget_released', 0):,.0f}.</li>
-<li>FDD: {ck.get('fdd_alarms', 0):,.0f} alarms, {ck.get('fdd_true_alarms', 0):,.0f} true.</li></ul>
+<li>{esc(ps)}: {_n(ck.get('proposals', 0))} proposals per seed; routes {', '.join(f"{k} {_n(v)}" for k, v in (ck.get('routes') or {}).items())}.</li>
+<li>Validator violations: {', '.join(f"{k} {_n(v)}" for k, v in (ck.get('violations') or {}).items()) or 'none'}. Corrupted proposals caught: {_n(ck.get('optimizer_faults_caught', 0))}.</li>
+<li>Peak budget: cap steps {_n((ck.get('algorithms') or {}).get('peak_budget', 0))}, held {_n((ck.get('algorithms') or {}).get('peak_budget_hold', 0))}, released {_n((ck.get('algorithms') or {}).get('peak_budget_released', 0))}.</li>
+<li>FDD: {_n(ck.get('fdd_alarms', 0))} alarms, {_n(ck.get('fdd_true_alarms', 0))} true.</li></ul>
 <h2>Scope</h2><p>{esc(sc['method'])}</p><div class='note'><b>Not established</b><ul>{''.join(f'<li>{esc(x)}</li>' for x in sc['not_established'])}</ul>{esc(sc['pilot_next'])}</div>
 <h2>Evidence</h2><ul>
 <li>Testbed commit <code>{esc(m['testbed']['commit'])}</code>; fixture <code>{esc(m['inputs']['fixture']['path'])}</code> <code>{esc(m['inputs']['fixture']['sha256'][:24])}…</code>; scenario <code>{esc(m['inputs']['scenario']['path'])}</code> <code>{esc(m['inputs']['scenario']['sha256'][:24])}…</code></li>
