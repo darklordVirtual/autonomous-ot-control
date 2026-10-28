@@ -105,3 +105,20 @@ def test_the_lab_work_order_is_in_the_episode_and_the_demo_publishes_the_same_on
     (ref, wo), = labs.items()
     assert wo == attacks.lab_work_order(ref[len("LAB-"):])
     assert "ZONE-03" in json.dumps(attacks.lab_intent(ref[len("LAB-"):]))
+
+
+def test_an_inline_edge_is_told_the_lab_work_order_in_every_set_that_has_it(monkeypatch):
+    from runner import demo
+    day = "2026-01-17"
+    for attack_set in (attacks.ALL_RULES, attacks.FULL):
+        monkeypatch.setattr(demo, "ATTACK_SET", attack_set)
+        cx = demo.edge_context(day, "ZONE-03", 21.0, attacks.lab_ref(day), attacks.BUDGET_AT_S)
+        assert cx["work_order"]["zones"] == {"ZONE-03": list(attacks.LAB_VALUES)}, attack_set
+    monkeypatch.setattr(demo, "ATTACK_SET", attacks.V1)
+    assert demo.edge_context(day, "ZONE-03", 21.0, attacks.lab_ref(day), attacks.BUDGET_AT_S)["work_order"]["zones"] == {}
+
+
+def test_every_zone_budget_window_is_scaled_in_the_accelerated_demo_policy():
+    pol = json.loads((ROOT / "deploy" / "ot" / "ot_limits.demo-accelerated.policy.json").read_text("utf-8"))
+    windows = {lim["resource"]: lim["window_seconds"] for lim in pol["limits"] if lim.get("quantity") == "setpoint_movement"}
+    assert windows == {"ZONE-01": 60, "ZONE-02": 60, "ZONE-03": 60}
