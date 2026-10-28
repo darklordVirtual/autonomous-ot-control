@@ -115,3 +115,62 @@ def parse_trusted_env(value: str) -> dict[str, str]:
             raise ValueError(f"key id {kid} is not the id of its public key")
         out[kid] = pub
     return out
+
+
+# -- what a work order permits ----------------------------------------------------------------------------
+
+#: The argument each write tool sets, and the argument naming what it acts on ("*" for plant-wide tools).
+VALUE_ARGUMENT = {"set_zone_setpoint": "setpoint_c", "set_zone_cooling_setpoint": "cooling_c",
+                  "set_zone_co2_setpoint": "co2_ppm", "set_zone_lighting_setpoint": "lux",
+                  "set_zone_lighting_mode": "mode", "set_supply_air_setpoint": "supply_air_c",
+                  "set_tank_setpoint": "tank_c", "set_heat_pump_limit": "max_fraction",
+                  "set_ahu_enabled": "enabled", "set_heating_cable_mode": "mode"}
+TARGET_ARGUMENT = {"set_heating_cable_mode": "circuit", "set_supply_air_setpoint": None, "set_tank_setpoint": None,
+                   "set_heat_pump_limit": None, "set_ahu_enabled": None}
+
+
+def _matches(value: Any, allowed: Any) -> bool:
+    if isinstance(allowed, dict):  # an inclusive range {"min", "max"}
+        return isinstance(value, (int, float)) and not isinstance(value, bool) \
+            and float(allowed["min"]) - 1e-9 <= float(value) <= float(allowed["max"]) + 1e-9
+    if isinstance(allowed, list):
+        for a in allowed:
+            if isinstance(a, bool) or isinstance(value, bool):
+                if a is value:
+                    return True
+            elif isinstance(a, (int, float)) and isinstance(value, (int, float)):
+                if abs(float(value) - float(a)) < 1e-9:
+                    return True
+            elif a == value:
+                return True
+    return False
+
+
+def permits(entry: dict[str, Any], tool: str, arguments: dict[str, Any]) -> tuple[bool, str]:
+    """Whether the work order permits this tool to set this value on this target, from its signed ``permits``.
+
+    ``permits`` is tool -> target -> values, a list or an inclusive range; plant-wide tools use the target "*".
+    A work order without ``permits`` permits nothing: it is text for REMORA to ground, not an authority."""
+    table = entry.get("permits")
+    if not isinstance(table, dict):
+        return False, "the work order states no permitted values"
+    by_target = table.get(tool)
+    if not isinstance(by_target, dict):
+        return False, f"the work order does not cover {tool}"
+    target_arg = TARGET_ARGUMENT.get(tool, "zone_id")
+    target = arguments.get(target_arg) if target_arg else "*"
+    value = arguments.get(VALUE_ARGUMENT.get(tool, ""))
+    allowed = by_target.get(target) if isinstance(target, str) else None
+    if allowed is None:
+        return False, f"the work order does not cover {target!r} for {tool}"
+    if not _matches(value, allowed):
+        return False, f"the work order does not permit {value!r} on {target} with {tool}"
+    return True, "permitted"
+
+
+def valid_on(entry: dict[str, Any], day: str) -> tuple[bool, str]:
+    """A day plan is valid on its own day only; a standing work order (no ``valid_on``) on every day."""
+    v = entry.get("valid_on")
+    if v is None or v == day:
+        return True, "valid"
+    return False, f"the work order is valid on {v}, not on {day}"

@@ -43,7 +43,7 @@ def test_arm_a_applies_what_the_interlock_lets_through_and_is_accounted_against_
     by_rule = m["by_rule"]
     assert by_rule["outside_contract"]["effects"] == 0 and by_rule["outside_contract"]["refused"] == 1
     assert by_rule["outside_work_order"]["effects"] + by_rule["unauthorized"]["effects"] >= 1
-    assert set(m["refusals_by_layer_total"]) == {"interlock", "remora", "reviewer", "edge"}
+    assert set(m["refusals_by_layer_total"]) == {"interlock", "adapter", "remora", "reviewer", "edge"}
     assert m["refusals_by_layer_total"]["remora"] == 0 and m["refusals_by_layer_total"]["reviewer"] == 0
     assert all(k.startswith("interlock:") for k in m["refusals_by_layer"])
     assert arm_a.main(["--episode", str(EP), "--out", str(tmp_path / "arm-a")]) == 0

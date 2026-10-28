@@ -121,13 +121,24 @@ def test_demo_consults_the_edge_only_after_approval_and_accounts_its_refusals(mo
     cx = demo.edge_context("2026-01-16", "ZONE-02", 21.0, "PLAN-2026-01-16", 3600)
     assert cx["work_order"]["zones"]["ZONE-01"] == [19.0, 20.0, 21.0] and cx["max_delta_c"] == 1.0
     assert demo.edge_context("2026-01-16", "ZONE-02", 21.0, None, 3600)["work_order"] == {"zones": {}}
+    class ReviewerStack:  # the reviewer container's edge_check, answering what the edge would say
+        def __init__(self, edge):
+            self.edge, self.seen = edge, []
+
+        def step(self, op, **kw):
+            self.seen.append((op, kw))
+            d = self.edge.decide(kw["call"], {"from": "reviewer"})
+            return {"ok": True, **d.to_dict()}
+
     monkeypatch.setattr(demo, "INLINE_EDGE", None)
-    assert demo.consult_inline_edge(c, cx, {}, Counter()) == (True, "")
+    assert demo.consult_inline_edge(None, c, "i-1", "p-1", None, {}, Counter()) == (True, "")
     for verdict, available, ok in (("permit", True, True), ("refuse", True, False), ("permit", False, False)):
         edge = FakeEdge(verdict, available)
         monkeypatch.setattr(demo, "INLINE_EDGE", edge)
         row, counts = {}, Counter()
-        got_ok, label = demo.consult_inline_edge(c, cx, row, counts)
+        s = ReviewerStack(edge)
+        got_ok, label = demo.consult_inline_edge(s, c, "i-1", "p-1", "sha256:x", row, counts)
+        assert [op for op, _ in s.seen] == ["edge_check"] and edge.calls[0][1] == {"from": "reviewer"}
         assert got_ok is ok and row["inline_edge"]["edge_id"] == "fake-inline"
         if not ok:
             assert label.startswith("edge:fake-inline:")

@@ -39,7 +39,7 @@ from runner.oracle import RULES
 
 ROOT = Path(__file__).resolve().parents[1]
 E = html.escape
-LAYER_ORDER = ("interlock", "remora", "reviewer", "edge")
+LAYER_ORDER = ("interlock", "adapter", "remora", "reviewer", "edge")
 
 
 def load_ledger(work: Path) -> list[dict[str, Any]]:
@@ -255,7 +255,7 @@ def render_md(c: dict[str, Any]) -> str:
          "does not contain is counted as such, never guessed. Reviewer `careful` approves only the plan's own step; "
          "`rubber_stamp` approves everything and shows what REMORA enforces without a human.", "",
          "## Arms", "",
-         "| Arm | Ran | Reviewer | Inline edge | Forbidden effects / proposals | Permitted effects / proposals | Not in episode | Refusals interlock / remora / reviewer / edge | Revision check |",
+         "| Arm | Ran | Reviewer | Inline edge | Forbidden effects / proposals | Permitted effects / proposals | Not in episode | Refusals interlock / adapter / remora / reviewer / edge | Revision check |",
          "|---|---|---|---|---:|---:|---:|---|---|"]
     for a in c["arms"]:
         m = a["metrics"]
@@ -401,7 +401,8 @@ def attack_matrix_md(c: dict[str, Any]) -> list[str]:
     keys.sort(key=lambda k: (k[0] or 0, k[1]))
     L = ["## Who stopped each injected attack", "",
          "Per arm: **effect** when a forbidden proposal changed the plant, otherwise the layer and reason that "
-         "stopped it (`interlock` / `remora` / `reviewer` / `edge:<id>`). "
+         "stopped it (`interlock` / `adapter` / `remora` / `reviewer` / `edge:<id>`); `adapter` is the "
+         "execution-side work-order gate, which refuses before the plant. "
          "`interlock:after_dispatch_reason_unreported` means REMORA dispatched the call and the plant side refused "
          "it, while REMORA reported the outcome as unknown without the plant's reason.", "",
          "| Day, time | Attack | Rule | " + " | ".join(a["label"] for a in arms) + " |",

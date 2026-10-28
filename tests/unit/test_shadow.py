@@ -39,6 +39,10 @@ class FakeStack:
 
     def step(self, op, **kw):
         self.steps.append(op)
+        self.args = getattr(self, "args", []) + [(op, kw)]
+        if op == "edge_check":
+            return {"ok": True, "edge_id": kw.get("edge_id"), "verdict": "refuse", "reason": "work_order_unsigned",
+                    "available": True, "latency_ms": 1.0}
         if op == "assess":
             if not self.assess_ok:
                 return {"ok": False, "status": 409, "body": {"detail": "contract_violation"}}
@@ -76,15 +80,24 @@ def test_shadow_is_asked_before_remora_even_when_remora_or_the_reviewer_refuses(
     assert row["reviewer"]["approved"] is False and not row["applied"] and "aps-shadow" in row["shadow"]
 
 
-def test_inline_and_shadow_edges_get_the_same_context(monkeypatch, tmp_path):
-    shadow, inline = FakeEdge("aps-shadow", "permit"), FakeEdge("inline", "refuse")
+def test_the_inline_edge_is_consulted_by_the_reviewer_never_with_the_proposers_context(monkeypatch, tmp_path):
+    """A/B/C weak point W6: the shadow edge is asked by the proposer (advisory, no effect); the inline edge, which
+    can stop a write, is consulted from the reviewer container, which assembles its context from its own sources.
+    The proposer hands over only the item, the proposal, the call and its declared basis."""
+    shadow, inline = FakeEdge("aps-shadow", "permit"), FakeEdge("inline", "permit")
     monkeypatch.setattr(demo, "SHADOW_EDGES", [shadow])
     monkeypatch.setattr(demo, "INLINE_EDGE", inline)
     monkeypatch.setattr(demo, "REVIEWER_MODEL", "rubber_stamp")
-    row = demo.governed_write(FakeStack(assess_ok=True), SC, 3600, "2026-01-15", "ZONE-01", 19.0, 20.0, "plan",
+    s = FakeStack(assess_ok=True)
+    row = demo.governed_write(s, SC, 3600, "2026-01-15", "ZONE-01", 19.0, 20.0, "plan",
                               "PLAN-2026-01-15", tmp_path, Counter(), "strategy:P1")
-    assert not row["applied"] and row["inline_edge"]["verdict"] == "refuse"
-    assert shadow.calls[0] == inline.calls[0]
+    assert not row["applied"] and row["inline_edge"] == {"edge_id": "inline", "verdict": "refuse",
+                                                          "reason": "work_order_unsigned", "available": True,
+                                                          "latency_ms": 1.0}
+    assert inline.calls == [] and len(shadow.calls) == 1  # the proposer never called the inline edge itself
+    (op, kw), = [x for x in s.args if x[0] == "edge_check"]
+    assert set(kw) == {"item_id", "proposal_id", "call", "edge_url", "edge_id", "basis_series_sha256"}
+    assert kw["basis_series_sha256"] == demo.VERIFIED_SERIES and "context" not in kw
 
 
 def test_shadow_accounting_cells():

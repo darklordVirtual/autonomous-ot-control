@@ -73,6 +73,10 @@ SUITE_ID = "ot-governed-demo/v1"
 REVIEWER_MODEL = "careful"
 #: Which injected attack classes the run carries (runner.attacks): v1, or all-rules for every oracle rule.
 ATTACK_SET = attacks_mod.V1
+#: The verified input series (ADR-005) the strategy computes from: the scenario the twin runs, by digest.
+VERIFIED_SERIES = "sha256:" + hashlib.sha256(SCENARIO.read_bytes()).hexdigest()
+#: Where the reviewer container reaches the inline edge (the compose service of the "abc" profile).
+INLINE_EDGE_REVIEWER_URL = os.environ.get("INLINE_EDGE_REVIEWER_URL", "http://inline-edge:8765/decide")
 INLINE_EDGE: admission.InlineEdge | None = None
 #: Shadow edges (ADR-011, authority-fixture contract): asked about every proposed write, before REMORA,
 #: on the same captured input an inline edge gets. Their answers are recorded and never change anything.
@@ -287,12 +291,20 @@ def capture_digests(rec: dict[str, Any]) -> dict[str, str | None]:
             "effect_observation_sha256": sha(rec.get("effect_observation"))}
 
 
-def consult_inline_edge(call: dict[str, Any], context: dict[str, Any], row: dict[str, Any],
-                        counts: Counter[str]) -> tuple[bool, str]:
-    """After REMORA and the reviewer approved: ask the inline edge, which can only remove."""
+def consult_inline_edge(s: Stack, call: dict[str, Any], item: str, pid: str, basis: str | None,
+                        row: dict[str, Any], counts: Counter[str]) -> tuple[bool, str]:
+    """After REMORA and the reviewer approved: ask the inline edge, which can only remove.
+
+    The edge is consulted from the reviewer container (deploy/ot/ot_reviewer.py ``edge_check``), which binds the
+    call to REMORA's record and tells the edge only what its own sources say (the signed work order, the twin's
+    readings), so a proposer cannot hand the edge a convenient context (A/B/C weak points W6, W7)."""
     if INLINE_EDGE is None:
         return True, ""
-    d = INLINE_EDGE.decide(call, context)
+    r = s.step("edge_check", item_id=item, proposal_id=pid, call=call, edge_url=INLINE_EDGE_REVIEWER_URL,
+               edge_id=INLINE_EDGE.edge_id, basis_series_sha256=basis)
+    d = admission.Decision(str(r.get("edge_id") or INLINE_EDGE.edge_id), str(r.get("verdict") or "refuse"),
+                           str(r.get("reason") or "no_answer"), bool(r.get("available")),
+                           float(r.get("latency_ms") or 0.0))
     row["inline_edge"] = d.to_dict()
     counts["edge_permit" if d.verdict == "permit" and d.available else
            ("edge_unavailable" if not d.available else "edge_refuse")] += 1
@@ -397,7 +409,8 @@ def executed_read(r: dict[str, Any]) -> bool:
 def governed_write(s: Stack, sc: Scenario, t: int, day: str, zone: str, current: float,
                    value: float, why: str, intent_ref: str | None, ddir: Path,
                    counts: Counter[str], origin: str, room_c: float = SETBACK_C,
-                   learner: ReheatLearner | None = None, execute_value: float | None = None) -> dict[str, Any]:
+                   learner: ReheatLearner | None = None, execute_value: float | None = None,
+                   basis: str | None = None) -> dict[str, Any]:
     """One governed write. With ``execute_value``, the call approved carries ``value`` and the call sent to
     execute carries ``execute_value`` (the tampered attack class: not the approved call)."""
     call: dict[str, Any] = {"tool_name": "set_zone_setpoint",
@@ -405,6 +418,7 @@ def governed_write(s: Stack, sc: Scenario, t: int, day: str, zone: str, current:
     if intent_ref:
         call["intent_ref"] = intent_ref
     exec_call = call if execute_value is None else {**call, "arguments": {"zone_id": zone, "setpoint_c": execute_value}}
+    basis = basis or VERIFIED_SERIES  # what the strategy computed from: the verified series, unless an attack says not
     row: dict[str, Any] = {"sim_time_s": t, "sim_utc": _utc(sc, t), "origin": origin, "zone_id": zone,
                            "from_c": current, "to_c": value if execute_value is None else execute_value,
                            **({} if execute_value is None else {"approved_c": value}), "strategy_reason": why,
@@ -428,14 +442,14 @@ def governed_write(s: Stack, sc: Scenario, t: int, day: str, zone: str, current:
     if item:
         if REVIEWER_MODEL == "independent":
             # SR-06: the reviewer container decides and approves (or rejects) itself; the proposer only names the item.
-            d = s.step("decide", item_id=item, proposal_id=pid, call=call)
+            d = s.step("decide", item_id=item, proposal_id=pid, call=call, basis_series_sha256=basis)
             ok, reason = bool(d.get("approved")), str(d.get("reason"))
             row["reviewer"] = {"model": REVIEWER_MODEL, "approved": ok, "reason": reason, "independent": True}
         else:
             ok, reason = review(sc, t, zone, value, current, intent_ref, day, room_c, learner)
             row["reviewer"] = {"model": REVIEWER_MODEL, "approved": ok, "reason": reason, "independent": False}
         if ok:
-            ok, edge_reason = consult_inline_edge(call, context, row, counts)
+            ok, edge_reason = consult_inline_edge(s, call, item, pid, basis, row, counts)
             reason = edge_reason or reason
         if ok:
             if REVIEWER_MODEL != "independent":
@@ -454,6 +468,10 @@ def governed_write(s: Stack, sc: Scenario, t: int, day: str, zone: str, current:
                 op = s.step("operation", operation_id=pid)
                 if op.get("ok") and body(op).get("status") == "REJECTED":
                     row["execute"].update(twin_status="REJECTED", detail=body(op).get("reason"))
+                elif op.get("status") == 404:
+                    # No operation at the twin: refused on the execution side before the plant, by the adapter's
+                    # work-order gate (or its contract check), which REMORA reports only as an unknown outcome.
+                    row["execute"].update(refused_before_plant=True, detail="work_order_gate")
             row["item_id"] = item
             if applied:
                 eff = s.step("record_effect", proposal_id=pid, zone_id=zone, setpoint_c=row["to_c"],
@@ -572,7 +590,8 @@ def inject_all_rules(s: Stack, sc: Scenario, t: int, day: str, ddir: Path,
                              spec["approved_value"] if tampered else spec["value"], spec["why"],
                              spec["intent_ref"], ddir, counts, "attack:" + spec["origin"].split(":", 1)[1],
                              room_c=float(live[zone]["measured_temp_c"]),
-                             execute_value=spec["value"] if tampered else None)
+                             execute_value=spec["value"] if tampered else None,
+                             basis=spec.get("basis_series_sha256"))
         for k in ("delegation_fault", "basis_series_sha256"):
             if k in spec:
                 row[k] = spec[k]
@@ -935,6 +954,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="arm C: consult this inline edge after REMORA and the reviewer approved (runner.admission)")
     p.add_argument("--inline-edge-url", default=os.environ.get("INLINE_EDGE_URL"),
                    help="override the edge's entrypoint.http (e.g. when it runs on this host)")
+    p.add_argument("--inline-edge-reviewer-url", default=None,
+                   help="where the reviewer container reaches the inline edge (default: the compose service)")
     p.add_argument("--attack-set", default=attacks_mod.V1, choices=attacks_mod.ATTACK_SETS,
                    help="injected attack classes (runner.attacks): v1, or all-rules for every oracle rule")
     p.add_argument("--shadow-edge", action="append", default=[], metavar="EDGE_DIR[=URL]",
@@ -944,6 +965,9 @@ def main(argv: list[str] | None = None) -> int:
     global REVIEWER_MODEL, INLINE_EDGE, SHADOW_EDGES, ATTACK_SET
     REVIEWER_MODEL = a.reviewer
     ATTACK_SET = a.attack_set
+    global INLINE_EDGE_REVIEWER_URL
+    if a.inline_edge_reviewer_url:
+        INLINE_EDGE_REVIEWER_URL = a.inline_edge_reviewer_url
     INLINE_EDGE = admission.InlineEdge.from_edge_dir(Path(a.inline_edge), url=a.inline_edge_url) if a.inline_edge else None
     SHADOW_EDGES = [admission.InlineEdge.from_edge_dir(Path(d), url=u or None)
                     for d, _, u in (spec.partition("=") for spec in a.shadow_edge)]

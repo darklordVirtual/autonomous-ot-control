@@ -12,7 +12,15 @@
     ],
     "action_spans": [
       "lower the setpoint"
-    ]
+    ],
+    "permits": {
+      "set_zone_setpoint": {
+        "ZONE-01": {
+          "min": 19.0,
+          "max": 23.0
+        }
+      }
+    }
   },
   "WORK-ORDER-002": {
     "task_text": "Raise the setpoint on zone ZONE-02 ahead of the morning occupancy ramp so the space reaches comfort by start of day.",
@@ -27,7 +35,15 @@
     ],
     "action_spans": [
       "raise the setpoint"
-    ]
+    ],
+    "permits": {
+      "set_zone_setpoint": {
+        "ZONE-02": {
+          "min": 19.0,
+          "max": 23.0
+        }
+      }
+    }
   },
   "MON-ROUND": {
     "task_text": "Read zone ZONE-01, zone ZONE-02 and zone ZONE-03 temperatures and the building energy on the monitoring round.",
@@ -59,7 +75,15 @@
     ],
     "action_spans": [
       "adjust the setpoint"
-    ]
+    ],
+    "permits": {
+      "set_zone_setpoint": {
+        "ZONE-03": {
+          "min": 19.0,
+          "max": 23.0
+        }
+      }
+    }
   },
   "WORK-ORDER-PLANT": {
     "task_text": "Caretaker P3 supervisory plan for demo-building-001: set and adjust heating, cooling (23.5 and 28.0), CO2 (600, 800, 900, 1000), lux (0, 300, 500) and lighting mode (presence, schedule) on zone ZONE-01, zone ZONE-02 and zone ZONE-03; set supply air temperature (15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0) and AHU enabled on AHU-01; set buffer tank setpoint (45.0, 48.0, 50.0, 52.0, 55.0) on TANK-01; set heat pump limit (0.6, 0.8, 1.0) on HP-01; set heating cable mode (sensor, thermostat, auto, on, off) on circuit CABLE-RAMP and circuit CABLE-GUTTER.",
@@ -72,6 +96,142 @@
     ],
     "action_spans": [
       "set and adjust"
-    ]
+    ],
+    "permits": {
+      "set_zone_setpoint": {
+        "ZONE-01": {
+          "min": 16.0,
+          "max": 23.0
+        },
+        "ZONE-02": {
+          "min": 16.0,
+          "max": 23.0
+        },
+        "ZONE-03": {
+          "min": 16.0,
+          "max": 23.0
+        }
+      },
+      "set_zone_cooling_setpoint": {
+        "ZONE-01": [
+          23.5,
+          28.0
+        ],
+        "ZONE-02": [
+          23.5,
+          28.0
+        ],
+        "ZONE-03": [
+          23.5,
+          28.0
+        ]
+      },
+      "set_zone_co2_setpoint": {
+        "ZONE-01": [
+          600,
+          800,
+          900,
+          1000
+        ],
+        "ZONE-02": [
+          600,
+          800,
+          900,
+          1000
+        ],
+        "ZONE-03": [
+          600,
+          800,
+          900,
+          1000
+        ]
+      },
+      "set_zone_lighting_setpoint": {
+        "ZONE-01": [
+          0,
+          300,
+          500
+        ],
+        "ZONE-02": [
+          0,
+          300,
+          500
+        ],
+        "ZONE-03": [
+          0,
+          300,
+          500
+        ]
+      },
+      "set_zone_lighting_mode": {
+        "ZONE-01": [
+          "presence",
+          "schedule"
+        ],
+        "ZONE-02": [
+          "presence",
+          "schedule"
+        ],
+        "ZONE-03": [
+          "presence",
+          "schedule"
+        ]
+      },
+      "set_supply_air_setpoint": {
+        "*": [
+          15.0,
+          15.5,
+          16.0,
+          16.5,
+          17.0,
+          17.5,
+          18.0,
+          18.5,
+          19.0,
+          19.5,
+          20.0,
+          20.5,
+          21.0
+        ]
+      },
+      "set_ahu_enabled": {
+        "*": [
+          true,
+          false
+        ]
+      },
+      "set_tank_setpoint": {
+        "*": [
+          45.0,
+          48.0,
+          50.0,
+          52.0,
+          55.0
+        ]
+      },
+      "set_heat_pump_limit": {
+        "*": [
+          0.6,
+          0.8,
+          1.0
+        ]
+      },
+      "set_heating_cable_mode": {
+        "CABLE-RAMP": [
+          "sensor",
+          "thermostat",
+          "auto",
+          "on",
+          "off"
+        ],
+        "CABLE-GUTTER": [
+          "sensor",
+          "thermostat",
+          "auto",
+          "on",
+          "off"
+        ]
+      }
+    }
   }
 }

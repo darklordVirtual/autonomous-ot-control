@@ -29,7 +29,6 @@ case "$ATTACK_SET" in
 esac
 EPISODE="scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-${DAYS}d${SUFFIX}.json"
 OUT="artifacts/${RUN_ID}"
-EDGE_PORT="${EDGE_PORT:-8765}"
 [[ -f "$EPISODE" ]] || { echo "run-abc: no episode for DAYS=${DAYS}: ${EPISODE} (python -m runner.episode build --days ${DAYS} --attack-set ${ATTACK_SET} --out ${EPISODE})" >&2; exit 2; }
 "$PY" -m runner.episode check "$EPISODE"
 mkdir -p "$OUT"
@@ -59,20 +58,16 @@ run_governed() {  # label, extra demo args...
   rm -rf "artifacts/${RUN_ID}-${label}-work" "artifacts/${RUN_ID}-${label}"
   # A governed arm that is not the careful acceptance may let a forbidden proposal through;
   # that is the measurement, so the demo exits 0 for such arms. Any other failure stops here.
-  RUN_ID="${RUN_ID}-${label}" STRATEGY=P1 DAYS="$DAYS" DEMO_ARGS="$* --attack-set ${ATTACK_SET} ${SHADOW_ARGS}" ./deploy/scripts/run-demo-governed.sh
+  RUN_ID="${RUN_ID}-${label}" STRATEGY=P1 DAYS="$DAYS" INLINE_EDGE="${INLINE_EDGE:-}"     DEMO_ARGS="$* --attack-set ${ATTACK_SET} ${SHADOW_ARGS}" ./deploy/scripts/run-demo-governed.sh
   mv "artifacts/${RUN_ID}-${label}-work" "${OUT}/${label}"
 }
 run_governed B-careful --reviewer careful
 run_governed B-rubber_stamp --reviewer rubber_stamp
 run_governed B-independent --reviewer independent
 
-echo "== reference inline edge on this host, port ${EDGE_PORT}"
-"$PY" federation/edges/_inline_template/server.py --port "$EDGE_PORT" &
-EDGE_PID=$!
-trap 'kill "$EDGE_PID" 2>/dev/null || true' EXIT
-sleep 1
-run_governed C-rubber_stamp --reviewer rubber_stamp --inline-edge federation/edges/_inline_template \
-  --inline-edge-url "http://127.0.0.1:${EDGE_PORT}/decide"
+# The reference inline edge runs as the compose service `inline-edge` (profile "abc"), and the reviewer container
+# consults it with a context from its own sources (SDD-OT-002, A/B/C weak points W6/W7).
+INLINE_EDGE=1 run_governed C-rubber_stamp --reviewer rubber_stamp --inline-edge federation/edges/_inline_template
 
 echo "== compare"
 "$PY" -m runner.ab_compare --episode "$EPISODE" --out "$OUT" \
