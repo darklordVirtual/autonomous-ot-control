@@ -7,9 +7,12 @@ within the harness's 2 s budget. It receives the exact call and a context
 the harness assembles from the day plan and the plant's declared step limit,
 and it checks, without consulting REMORA, the reviewer or the plant:
 
-1. the call names a zone the work order covers;
-2. the value is one the work order permits for that zone;
-3. the step from the current setpoint is within the declared maximum.
+1. the context reports no problem with the work order itself (``work_order_problem``: unsigned, expired,
+   missing; the reviewer that assembles the context verified the signed order);
+2. the proposal's basis is the verified series, when the context names one (``verified_series``);
+3. the call names a zone the work order covers;
+4. the value is one the work order permits for that zone;
+5. the step from the current setpoint is within the declared maximum.
 
 Anything else is ``refuse`` with the first reason that failed. It holds no
 credential, reaches nothing, and can only add refusals: the harness consults
@@ -38,6 +41,12 @@ def decide(payload: dict[str, Any]) -> dict[str, Any]:
     args = call.get("arguments") or {}
     if call.get("tool_name") != TOOL:
         return {"verdict": "refuse", "reason": f"tool_not_admitted:{call.get('tool_name')}"}
+    problem = ctx.get("work_order_problem")
+    if problem:
+        return {"verdict": "refuse", "reason": f"work_order_{problem}"}
+    verified = ctx.get("verified_series")
+    if verified and ctx.get("basis_series_sha256") != verified:
+        return {"verdict": "refuse", "reason": "basis_not_verified"}
     plan = (ctx.get("work_order") or {}).get("zones") or {}
     zone = args.get("zone_id")
     if zone not in plan:

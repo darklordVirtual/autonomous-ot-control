@@ -173,7 +173,7 @@ def setpoint(s: Stack, zone: str) -> float:
 #: and a body to count as a decision. SDK-mediated steps (record_effect, sdk_approve) return their own shape and
 #: are judged by their case; tests/unit/test_acceptance_transport.py keeps this list equal to harness_step.
 #: Steps the reviewer container runs (deploy/ot/ot_reviewer.py): the approver's token is there only (SR-06).
-REVIEWER_OPS = frozenset({"approve", "reject", "sdk_approve", "decide", "unresolved", "resolve"})
+REVIEWER_OPS = frozenset({"approve", "reject", "sdk_approve", "decide", "edge_check", "unresolved", "resolve"})
 REMORA_OPS = frozenset({"assess", "approve", "reject", "execute", "execute_accepted", "proposal", "envelope",
                         "evidence", "lifecycle", "audit_verify", "unresolved", "resolve"})
 
@@ -654,6 +654,58 @@ def at_sr05_signed_work_orders(c: Ctx) -> tuple[bool, str]:
     return ok and after == before, f"{seen}; signed by {issued['key_id']}; revision {before}->{after}"
 
 
+def at_work_order_gate(c: Ctx) -> tuple[bool, str]:
+    """The execution-side work-order gate (A/B/C weak points W1, W2): the tester approves three writes whose
+    authority is wrong (a value the day plan does not permit, yesterday's plan, a work order nobody signed), and
+    each is refused before the plant. The reviewer approved; the gate, not the reviewer, is the last word."""
+    s = c.s
+    s.ctl("advance", "900")
+    day = str(s.step("status")["body"]["sim_utc"])[:10]
+    from datetime import date, timedelta
+    yday = (date.fromisoformat(day) - timedelta(days=1)).isoformat()
+    s.authority("plan-P1", yday)
+    today = s.authority("plan-P1", day)["intent_ref"]
+    table = json.loads(INTENT_TABLE.read_text("utf-8"))
+    forged_ref = f"PLAN-{day}-GATE"
+    table[forged_ref] = {k: v for k, v in table[today].items() if k != "signature"}
+    INTENT_TABLE.write_text(json.dumps(table, indent=2, sort_keys=True) + "\n", "utf-8")
+    sp0 = setpoint(s, "ZONE-01")
+    in_plan = 20.0 if sp0 != 20.0 else 21.0
+    off_plan = next(v for v in (round(sp0 + d, 1) for d in (0.5, -0.5, 0.3, -0.3))
+                    if v not in (19.0, 20.0, 21.0) and 19.0 <= v <= 23.0)  # in contract, one step, not in the plan
+    seen, ok = {}, True
+    before = revision(s)
+    for name, ref, value in (("off_plan", today, off_plan), ("expired", f"PLAN-{yday}", in_plan),
+                             ("unsigned", forged_ref, in_plan)):
+        cl = call("ZONE-01", value, wo=ref)
+        a = s.step("assess", **cl)
+        require_answer(a, f"GATE-01 assess {name}")
+        item, pid = body(a).get("review_item_id"), body(a).get("proposal_id")
+        if not item:  # the case is about the gate: a write that never reaches it is a failure of the case
+            seen[name] = f"refused at assess ({a['status']} {body(a).get('detail')})"
+            ok = False
+            continue
+        pending_before = {o.get("operation_id") for o in body(s.step("unresolved")).get("operations", [])}
+        ap = s.step("approve", item_id=item)
+        ex = s.step("execute", item_id=item, **cl)
+        require_answer(ex, f"GATE-01 execute {name}")
+        op = s.step("operation", operation_id=pid)
+        # REMORA reports the gate's refusal as an unknown outcome (weak point W5): settle it from the plant's
+        # log, which has no such operation, so the reservation is returned and the next case has its budget.
+        pending = [o.get("operation_id") for o in body(s.step("unresolved")).get("operations", [])
+                   if o.get("operation_id") not in pending_before]
+        settled = [s.step("resolve", operation_id=o, executed=False, evidence_ref=f"twin-op:{pid}",
+                          reason="GATE-01: refused by the work-order gate, no operation at the twin")["status"]
+                   for o in pending]
+        seen[name] = (f"approve={ap['status']} executed={executed(ex)} twin_record={op.get('status')} "
+                      f"settled={settled}")
+        ok = ok and ap.get("ok") and not executed(ex) and op.get("status") == 404 and settled == [200] * len(pending)
+    after = revision(s)
+    del table[forged_ref]
+    INTENT_TABLE.write_text(json.dumps(table, indent=2, sort_keys=True) + "\n", "utf-8")
+    return ok and after == before, f"{seen}; revision {before}->{after}"
+
+
 def at_audit_chain_valid(c: Ctx) -> tuple[bool, str]:
     v = c.s.step("audit_verify")
     b = body(v)
@@ -685,6 +737,7 @@ CASES: list[tuple[str, str, Case]] = [
     ("SR-06", "the proposer cannot approve its own change; the reviewer cannot propose", at_sr06_no_self_approval),
     ("SR-05", "only a work order the authority signed grounds a write and passes the reviewer",
      at_sr05_signed_work_orders),
+    ("GATE-01", "approved writes under a wrong work order are refused before the plant", at_work_order_gate),
     ("AUD-01", "tenant audit chain verifies", at_audit_chain_valid),
     ("INV-ALL", "no effect beyond those the cases expected", at_no_unexplained_effect),
 ]

@@ -43,9 +43,16 @@ def issue(kind: str, day: str, seed_path: Path = SEED, table_path: Path = TABLE)
     ref, entry = ot_day_plans.KINDS[kind](day)
     signed = wo.sign_entry(ref, entry, key)
     table = json.loads(table_path.read_text("utf-8")) if table_path.exists() else {}
+    # A day order is withdrawn once a later day's order is issued: an expired order is not merely refused by the
+    # gate and the reviewer, it is gone from the table REMORA grounds against (A/B/C weak point W2).
+    retired = sorted(r for r, e in table.items()
+                     if isinstance(e, dict) and isinstance(e.get("valid_on"), str) and e["valid_on"] < day)
+    for r in retired:
+        del table[r]
     table[ref] = signed
     write_table(table_path, table)
-    return {"intent_ref": ref, "key_id": signed["signature"]["key_id"], "digest": wo.entry_digest(ref, signed)}
+    return {"intent_ref": ref, "key_id": signed["signature"]["key_id"], "digest": wo.entry_digest(ref, signed),
+            "retired": retired}
 
 
 def main(argv: list[str] | None = None) -> int:

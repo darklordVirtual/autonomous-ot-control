@@ -40,8 +40,7 @@ def plan_entry(day: str, strategy: str = "P1") -> tuple[str, dict[str, Any]]:
         return ref, {"task_text": text, "operation": "update", "resource_type": "zone",
                      "requested_effect": "update", "target_entities": [],
                      "source_spans": ["demo-building-001"], "action_spans": ["set and adjust"],
-                     "valid_on": day,
-                     "permits": {"set_zone_setpoint": {z: list(P3_HEATING) for z in ("ZONE-01", "ZONE-02", "ZONE-03")}}}
+                     "valid_on": day, "permits": _p3_permits()}
     text = (f"Day plan {day} for demo-building-001 (strategy P1): set the heating setpoint of "
             f"zone ZONE-01 and zone ZONE-02 to 19.0 during setback, to 20.0 and 21.0 during "
             f"preheat, and to 21.0 while occupied; zone ZONE-03 stays at 21.0.")
@@ -51,6 +50,22 @@ def plan_entry(day: str, strategy: str = "P1") -> tuple[str, dict[str, Any]]:
                  "valid_on": day,
                  "permits": {"set_zone_setpoint": {**{z: list(P1_VALUES) for z in SETBACK_ZONES},
                                                    "ZONE-03": [OCCUPIED_C]}}}
+
+
+def _p3_permits() -> dict[str, Any]:
+    """Every value the P3 plan's text names, per tool and target: what the work-order gate lets through."""
+    zones = ("ZONE-01", "ZONE-02", "ZONE-03")
+    return {
+        "set_zone_setpoint": {z: list(P3_HEATING) for z in zones},
+        "set_zone_cooling_setpoint": {z: [23.5, 24.0, 24.5, 28.0] for z in zones},
+        "set_zone_co2_setpoint": {z: [600, 800, 900, 1000] for z in zones},
+        "set_zone_lighting_mode": {z: ["presence", "schedule"] for z in zones},
+        "set_supply_air_setpoint": {"*": [15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0]},
+        "set_ahu_enabled": {"*": [True, False]},
+        "set_tank_setpoint": {"*": [45.0, 48.0, 50.0, 51.0, 52.0, 53.0, 54.0, 55.0]},
+        "set_heat_pump_limit": {"*": [0.6, 1.0]},
+        "set_heating_cable_mode": {c: ["sensor", "thermostat", "auto"] for c in ("CABLE-RAMP", "CABLE-GUTTER")},
+    }
 
 
 def lab_entry(day: str) -> tuple[str, dict[str, Any]]:

@@ -59,7 +59,7 @@ def test_attach_and_metrics_against_the_episode():
     assert (m["permitted_effects"], m["permitted_proposals"]) == (3, 3)
     assert (m["forbidden_effects"], m["forbidden_proposals"]) == (0, 4)
     assert (m["not_in_episode_effects"], m["not_in_episode_proposals"]) == (1, 1)
-    assert m["refusals_by_layer_total"] == {"interlock": 0, "remora": 2, "reviewer": 2, "edge": 0}
+    assert m["refusals_by_layer_total"] == {"interlock": 0, "adapter": 0, "remora": 2, "reviewer": 2, "edge": 0}
     assert m["by_rule"]["outside_work_order"] == {"proposals": 1, "effects": 0, "refused": 1}
     assert m["by_rule"]["duplicate_effect"]["refused"] == 1 and m["by_rule"]["unauthorized"]["refused"] == 1
     assert m["revision_check"]["match"] is True and m["effects"] == 4

@@ -96,6 +96,9 @@ services:
       # SR-05: only an entry signed by the work-order authority grounds a write (deploy/ot/ot_bundle.py). The
       # trust anchor is pinned here from .env, never read from /etc/remora-ot, which the authority writes.
       REMORA_OT_WORK_ORDER_TRUSTED_KEYS: ${REMORA_OT_WORK_ORDER_TRUSTED_KEYS:?run deploy/scripts/governed-bootstrap.sh}
+      # The execution-side work-order gate (deploy/ot/ot_registry.py): no write reaches the plant unless the work
+      # order REMORA admitted it under is signed, valid today and permits the value. Not a reviewer's call.
+      REMORA_OT_WORK_ORDER_GATE: enforce
       # Risk tier, action type and schema/rollback flags per tool (ADR-008).
       REMORA_TOOL_METADATA_FILE: /app/ot_tool_metadata.json
       REMORA_EXECUTION_ARTIFACT_DIR: /var/lib/remora/artifacts
@@ -218,10 +221,29 @@ services:
       REMORA_INTENT_SOURCE_FILE: /etc/remora-ot/ot_intents.json
       REMORA_OT_WORK_ORDER_TRUSTED_KEYS: ${REMORA_OT_WORK_ORDER_TRUSTED_KEYS:?run deploy/scripts/governed-bootstrap.sh}
       OT_TOOLSPEC_PATH: /app/contracts/ot-toolspec-v1.json
+      # The verified input series (ADR-005) a proposal must declare as its basis; unset, the check is off.
+      OT_VERIFIED_SERIES: ${OT_VERIFIED_SERIES:-}
       # Deliberately absent: REMORA_OPERATOR_TOKEN, TWIN_ACTUATOR_TOKEN, TWIN_CONTROL_TOKEN.
     volumes:
       - ./deploy/.generated:/etc/remora-ot:ro
     networks: [observe, authority]
+
+  # The A/B/C's reference inline edge (federation/edges/_inline_template), as a service the reviewer consults
+  # (deploy/ot/ot_reviewer.py edge_check) so its context comes from the reviewer's sources, never the proposer's.
+  # Standard library only; it holds no credential and reaches nothing. Started only with the "abc" profile.
+  inline-edge:
+    <<: *hardening
+    image: python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
+    profiles: ["abc"]
+    command: ["python", "/edge/server.py", "--host", "0.0.0.0", "--port", "8765"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,json;urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8765/decide', data=b'{}', method='POST'), timeout=2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./federation/edges/_inline_template:/edge:ro
+    networks: [observe]
 
   # Acceptance harness (OT-005): a long-running, credential-scoped step
   # executor the host driver (runner/acceptance.py) calls with

@@ -14,6 +14,14 @@ as the twin's single-use operation id so a REMORA re-invocation of the same
 proposal cannot produce a second effect (INV-04, INV-10). It constructs no
 grant, lease or policy — REMORA authorizes (INV-11).
 
+Before any write reaches the plant, the work-order gate (SDD-OT-002, the A/B/C weak points W1 and W2) checks the
+authority REMORA admitted the call under, itself, on the execution side: REMORA's own record of the assessment
+must name a work order that resolved, the work order must be one the work-order authority signed, it must be
+valid on the plant's current day, and its signed ``permits`` must cover this tool, target and value. Otherwise
+the write is refused before the twin is called. The reviewer is then no longer the only gate between a VERIFY and
+the plant. ``REMORA_OT_WORK_ORDER_GATE=enforce`` turns it on; it reads REMORA's chain in-process, a
+version-pinned integration like ``CURRENT_PROPOSAL_ID`` (D-03).
+
 The same module also supplies the cumulative-limits hooks REMORA calls when
 limits are enabled: ``observe_limit_value`` (the plant's own value, for the
 ``observed`` meters) and ``check_limit_evidence`` (resolve an UNKNOWN outcome
@@ -25,18 +33,74 @@ lazily and may be injected in tests.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
+import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import httpx
 
 from adapter.actuation import (ActuationError, ActuatorClient, EffectUnknown, apply_plant_command,
                                apply_setpoint, build_plant_command, build_setpoint_command, check_replay)
-from adapter.contracts import ALL_WRITE_TOOLS, READ_TOOLS, ToolSpec
+from adapter.contracts import ALL_WRITE_TOOLS, READ_TOOLS, ToolSpec, ToolSpecError
+from adapter.work_orders import permits, valid_on
 
 READ_TIMEOUT_S = 5.0
+TENANT = os.environ.get("OT_TENANT", "ot-pilot")
+
+
+class WorkOrderGate:
+    """The execution-side check of the work order a write was admitted under (see the module docstring).
+
+    ``assessed(proposal_id)`` returns REMORA's ``assessed`` record for the proposal and ``intent_hash(ref)`` REMORA's
+    hash of the work order its bundle resolves for ``ref`` (None when it resolves nothing, e.g. unsigned). Both
+    default to REMORA's own code, in-process; tests inject them."""
+
+    def __init__(self, table_path: str, assessed: Callable[[str], dict[str, Any]] | None = None,
+                 intent_hash: Callable[[str], str | None] | None = None) -> None:
+        self.table_path = Path(table_path)
+        self._assessed = assessed or _remora_assessed
+        self._intent_hash = intent_hash or _remora_intent_hash
+
+    def check(self, proposal_id: str, tool: str, arguments: dict[str, Any], plant_day: str) -> str:
+        """The work order's reference when the write may proceed; raises ``ActuationError`` otherwise."""
+        try:
+            assessed = self._assessed(proposal_id)
+        except Exception as e:  # REMORA's record unreadable: fail closed
+            raise ActuationError(f"work_order_gate:record_unavailable:{type(e).__name__}") from None
+        if assessed.get("intent_resolution_status") != "resolved" or not assessed.get("intent_authority_hash"):
+            raise ActuationError("work_order_gate:unresolved_work_order")
+        try:
+            table = json.loads(self.table_path.read_text("utf-8"))
+        except (OSError, ValueError):
+            raise ActuationError("work_order_gate:table_unreadable") from None
+        ref = next((r for r in sorted(table) if self._intent_hash(r) == assessed["intent_authority_hash"]), None)
+        if ref is None:
+            raise ActuationError("work_order_gate:no_signed_work_order")
+        ok, why = valid_on(table[ref], plant_day)
+        if not ok:
+            raise ActuationError(f"work_order_gate:expired:{ref}")
+        ok, why = permits(table[ref], tool, arguments)
+        if not ok:
+            raise ActuationError(f"work_order_gate:not_permitted:{ref}")
+        return ref
+
+
+def _remora_assessed(proposal_id: str) -> dict[str, Any]:  # pragma: no cover - only in the REMORA image
+    from servers.execution_api import _proposal_events
+    return next(e["payload"] for e in _proposal_events(TENANT, proposal_id) if e.get("event") == "assessed")
+
+
+def _remora_intent_hash(ref: str) -> str | None:  # pragma: no cover - only in the REMORA image
+    if "/app" not in sys.path:
+        sys.path.insert(0, "/app")
+    import ot_bundle
+    from remora.toolcall.semantic_bundle import compute_intent_authority_hash
+    resolved = ot_bundle.resolve_intent(ref)
+    return compute_intent_authority_hash(resolved) if resolved is not None else None
 # REMORA proposal ids are UUIDs; nothing else goes into a twin operation URL.
 _OPERATION_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
@@ -64,10 +128,12 @@ class OtTools:
 
     def __init__(self, *, actuator: ActuatorClient, read_base_url: str, read_token: str,
                  toolspec: ToolSpec, read_client: httpx.Client | None = None,
-                 proposal_id: Callable[[], str] = _current_proposal_id) -> None:
+                 proposal_id: Callable[[], str] = _current_proposal_id,
+                 work_order_gate: WorkOrderGate | None = None) -> None:
         self._actuator = actuator
         self._toolspec = toolspec
         self._proposal_id = proposal_id
+        self._gate = work_order_gate
         self._read = read_client or httpx.Client(base_url=read_base_url, timeout=READ_TIMEOUT_S)
         self._read_headers = {"Authorization": f"Bearer {read_token}"}
 
@@ -92,6 +158,17 @@ class OtTools:
         r = self._read.get("/v1/status", headers=self._read_headers)
         r.raise_for_status()
         return int(r.json()["state_revision"])
+
+    def _check_work_order(self, operation_id: str, tool: str, arguments: dict[str, Any]) -> None:
+        if self._gate is None:
+            return
+        try:
+            canonical = self._toolspec.canonical_tool_arguments(tool, arguments)
+        except ToolSpecError:
+            return  # outside the signed contract: apply_* refuses it, with the contract's reason
+        r = self._read.get("/v1/status", headers=self._read_headers)
+        r.raise_for_status()
+        self._gate.check(operation_id, tool, canonical, str(r.json()["sim_utc"])[:10])
 
     def _prior_effect(self, operation_id: str) -> dict[str, Any] | None:
         """The stored outcome for this proposal id, if it already ran."""
@@ -120,6 +197,7 @@ class OtTools:
                 if prior.get("status") != "APPLIED":
                     raise ActuationError(f"prior_outcome:{prior.get('reason') or prior.get('status')}")
                 return {**prior, "replayed": True}
+            self._check_work_order(operation_id, "set_zone_setpoint", arguments)
             revision = self._current_revision()
         except httpx.HTTPError as e:
             raise EffectUnknown(f"could not read plant state: {type(e).__name__}") from None
@@ -136,6 +214,7 @@ class OtTools:
                 if prior.get("status") != "APPLIED":
                     raise ActuationError(f"prior_outcome:{prior.get('reason') or prior.get('status')}")
                 return {**prior, "replayed": True}
+            self._check_work_order(operation_id, tool_name, arguments)
             revision = self._current_revision()
         except httpx.HTTPError as e:
             raise EffectUnknown(f"could not read plant state: {type(e).__name__}") from None
@@ -184,8 +263,11 @@ def build_from_env() -> OtTools:
     toolspec = ToolSpec.load(os.environ.get("OT_TOOLSPEC_PATH") or None)
     actuator = ActuatorClient(_require_env("OT_TWIN_ACTUATOR_URL"),
                               _require_env("TWIN_ACTUATOR_TOKEN"))
+    gate = None
+    if os.environ.get("REMORA_OT_WORK_ORDER_GATE", "").strip() == "enforce":
+        gate = WorkOrderGate(_require_env("REMORA_INTENT_SOURCE_FILE"))
     return OtTools(actuator=actuator, read_base_url=_require_env("OT_TWIN_READ_URL"),
-                   read_token=_require_env("TWIN_READ_TOKEN"), toolspec=toolspec)
+                   read_token=_require_env("TWIN_READ_TOKEN"), toolspec=toolspec, work_order_gate=gate)
 
 
 _TOOLS: OtTools | None = None

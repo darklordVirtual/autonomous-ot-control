@@ -11,6 +11,8 @@ export MSYS_NO_PATHCONV=1
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-aoc-demo}"
 export TWIN_CONFIG=/app/twin/fixtures/three-zone-hvac-v1.json
 export TWIN_SCENARIO=/app/scenarios/trondheim-week-2026w03-hvac-v1.json
+# The verified input series (ADR-005) a proposal must declare as its basis: the scenario the twin runs, by digest.
+export OT_VERIFIED_SERIES="sha256:$(sha256sum scenarios/trondheim-week-2026w03-hvac-v1.json | cut -d' ' -f1)"
 COMPOSE=(docker compose -f compose.yaml -f compose.governed.yaml)
 RUN_ID="${RUN_ID:-demo-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 mkdir -p artifacts
@@ -23,7 +25,10 @@ export OT_GIT_SHA="$(git rev-parse HEAD 2>/dev/null || echo UNKNOWN)$(git diff -
 
 "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 trap '"${COMPOSE[@]}" logs --no-color remora twin > "artifacts/${RUN_ID}-stack.log" 2>&1 || true; "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
-"${COMPOSE[@]}" up --build -d --wait postgres remora twin harness authority reviewer
+SERVICES=(postgres remora twin harness authority reviewer)
+# INLINE_EDGE=1: the reference inline edge as the compose service the reviewer consults (profile "abc").
+if [[ -n "${INLINE_EDGE:-}" ]]; then SERVICES+=(inline-edge); COMPOSE+=(--profile abc); fi
+"${COMPOSE[@]}" up --build -d --wait "${SERVICES[@]}"
 
 # DEMO_ARGS: extra runner.demo flags, e.g. "--reviewer rubber_stamp --inline-edge federation/edges/_inline_template"
 # (run-abc.sh uses them for arms B and C).

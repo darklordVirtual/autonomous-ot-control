@@ -25,7 +25,9 @@ from typing import Any
 
 from runner import episode as episode_mod
 
-LAYERS = ("interlock", "remora", "reviewer", "edge")
+#: interlock: the twin refused the write; adapter: the execution-side work-order gate refused it before the plant
+#: (deploy/ot/ot_registry.py); remora: refused at assess, not executed, or a replay; reviewer; edge:<id>.
+LAYERS = ("interlock", "adapter", "remora", "reviewer", "edge")
 
 
 def _short(x: Any, n: int = 60) -> str:
@@ -59,6 +61,9 @@ def refused_by(row: dict[str, Any]) -> str | None:
     if isinstance(ex, dict):
         if ex.get("twin_status") == "REJECTED":
             return f"interlock:{_short(ex.get('detail') or 'rejected')}"
+        if ex.get("refused_before_plant"):
+            # Dispatched, and the twin has no record of the operation: the adapter's work-order gate refused it.
+            return f"adapter:{_short(ex.get('detail') or 'refused_before_plant')}"
         if ex.get("outcome") == "execute" and ex.get("status") == 200 and ex.get("twin_status") is None:
             # REMORA dispatched the call and the plant side refused it (the adapter or the twin's interlock); REMORA
             # reports that as an unknown outcome without the plant's reason. Before 2026-10-28 this was counted
