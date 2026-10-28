@@ -114,6 +114,60 @@ The `abc-report.md`, `abc-report.html` and machine-readable summary must state:
 
 **Commercial interpretation is optional and downstream.** The exact number of real verifier calls may inform a negotiated usage price, but shadow calls are not automatically billable. Illustrative expected value may depend on customer-specific incident prevalence, severity, false-refusal cost, latency, reliability and implementation cost; synthetic results establish none of those customer-specific inputs and do not by themselves define revenue share.
 
+### 9. Profile for offline evidence verification (`effect_evidence`)
+
+An offline `effect_evidence` edge is not a C arm. It reads a trail after the
+effect and can neither stop nor permit an action, so B vs C does not measure
+it. It gets its own profile, implemented centrally in the testbed
+(`runner.edge_pass`, `runner.edge_usage`) and never in a contributor's code.
+
+- **Unit:** one applied trail (a case), identified by the SHA-256 of its
+  canonical case JSON. A **verifier run** is one local, offline start of the
+  edge over a whole case set. It is not an API call to the contributor, and
+  one run may answer many trails.
+- **Inputs must be recorded, not made up.** Each claim's input comes from a
+  record written when it happened: REMORA's readback and lifecycle, the twin's
+  operation record, the observer's sealed record, and the digest captured in
+  the ledger at export (or REMORA's per-section export manifest). A missing
+  record is `NOT_ESTABLISHED`. A record that contradicts itself or its capture
+  digest is `CONTRADICTED`. Every result is reported three ways: the edge's
+  own answer, the answer on recorded inputs only, and the answer under strict
+  vantage (an independent observation required). The source of each claim is
+  listed.
+- **Use** (`usage.json` per pass, summed by `runner.edge_usage` per edge and
+  contributor):
+  - `verifier_runs`, plus availability as successful versus failed runs;
+  - `runtime_ms`;
+  - `cases_processed`, `distinct_cases` and `not_established`;
+  - `distinct_findings`;
+  - agreement with the reference verifier. A finding only the contributed
+    edge made is a candidate for review, never a confirmed finding.
+
+  Every row is tied to the edge's version digest, the input digest and the
+  run id. A repeated input on the same version adds use but no new cases or
+  findings.
+- **Value needs a ground truth.** `findings_confirmed`, `unique_findings`
+  (correct where the reference verifier was wrong) and `false_findings` are
+  counted only where a ground truth exists, and stay null on live trails:
+  - sealed fixture sets, whose run records already count established
+    positives, caught negatives and false refusals;
+  - planned: seeded mutations of live trails, sealed with their expected
+    verdict before any edge runs.
+- **What a second implementation adds** even with no unique finding:
+  reproduction of the same verdicts by independently written code. It is
+  reported as agreement (n compared, n agreed), not as caught faults.
+- **Use is not value.** Counts of runs or trails do not show a safety gain,
+  and a price discussion may use them only as use.
+
+Applied to Probity's `agent-evidence-vectors-axes`:
+
+- Its v1 record (12/12, 6/6, `L4_INDEPENDENT_HOST_RUN` from the declared
+  operator and host) stays as recorded. Both it and the reference verifier
+  caught all six seeded faults, so there are no unique findings on v1.
+- v2 is run against it only if its maintainer opts in, and would be a new
+  record.
+- On live trails it is measured by this profile, never as an arm.
+
 ## Implementation slices and acceptance
 
 1. **Fixture contract:** define signed work-order schema, test-only keys, JCS payload/digest, ToolSpec v5 pin binding, UTC clock, delegation reference and the five #27 cases. Freeze manifest with independent oracle and negative controls. No REMORA SDK changes.
@@ -122,6 +176,7 @@ The `abc-report.md`, `abc-report.html` and machine-readable summary must state:
 4. **Inline C:** attach the existing refusal-only `POST /decide` entrypoint **after B approval**; compare inline/shadow outputs on equivalent inputs, audit fail-closed/unavailable handling and prevent any edge from becoming an authorization or actuator path.
 5. **Comparison:** add per-class matrices, paired effect outcomes, conditional utility/cost metrics, descriptive Wilson intervals, multi-seed/cluster summaries and machine-readable provenance. Make CI fail on omitted proposals, unstated exclusions, missing arms claimed as measured, altered oracle/fixture pins and arithmetic mismatches.
 6. **Independent reproduction:** invite APS to confirm the contract and submit its own pinned verifier/results; use the established record/independence-level rules rather than inventing a new certification claim.
+7. **Offline evidence profile (section 9):** usage accounting per pass and across passes and the recorded-input rule are implemented (`runner.edge_pass`, `runner.edge_usage`, merged on `main`). Still open: seeded mutation sets of live trails as a ground truth for confirmed, unique and false findings.
 
 **Acceptance checks:** every frozen proposal has exactly one oracle row and complete layer-status accounting; refusal-only composition still holds; no missing run or unavailable edge is counted as an APS catch; all four forbidden-capture cells plus unresolved equal the forbidden denominator; B/C effect counts reconcile with twin revision/operation records; a negative/diffing run fails deterministically; changing a sealed input creates a new version; reports never claim physical safety.
 
