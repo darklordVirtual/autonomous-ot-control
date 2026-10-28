@@ -104,6 +104,6 @@ the rubber-stamp reviewer does not check one. The independent reviewer and the i
 | W5 | A plant-side refusal comes back as UNKNOWN | **Accounted**: the ledger names the layer (`adapter` / `interlock`) from the twin's own record; `GATE-01` settles each unknown outcome from the twin's log. REMORA treats every exception after the nonce as unknown by design; a typed "refused, no effect" is an upstream proposal. |
 | W6 | The inline edge got its context from the proposer | **Closed**: the reviewer container consults the edge, with a context it builds from its own sources after binding the item and the call to REMORA's record. |
 | W7 | The edge could not tell missing, expired and forged apart | **Closed**: it is told the precise problem (`missing`, `unsigned`, `expired`, `unresolved`). |
-| W8 | No offline authority edge | Open: the APS fixture contract (issue #27). |
+| W8 | No offline authority edge | **Offline: in place.** APS's delegation verifier (PR #35) decides the delegation side on the sealed set `aps-1`, 5/5, [reproduced on this host](aps-authority.md). Not yet consulted inline in the A/B/C arms; the contract puts that after APS's review of the offline results. |
 | W9 | The interlock alone allows unapproved changes | By design: arm A is the known-negative floor. |
 | W10 | Wall-clock limit windows in an accelerated simulation | Fixed for the demo; stated in every report. |

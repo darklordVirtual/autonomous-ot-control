@@ -1,0 +1,121 @@
+{
+  "call": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "decision_time": "2026-01-15T07:00:00Z",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-normalized-call/v1",
+    "unit": "degC",
+    "value": 20.5
+  },
+  "case_id": "af-4-out-of-scope",
+  "construction": "a valid, narrowed chain grants the agent ZONE-02 only; the call is on ZONE-01",
+  "delegation": [
+    {
+      "authority": {
+        "depth": {
+          "remaining": 1
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+            "ot:demo-building-001:ZONE-02:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T23:59:59.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:building-owner",
+      "nonce": "4683832339816af75723b7ce780fdabe",
+      "parent_delegation_id": null,
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "42a429463f8ac762eb8f00792e7f3de15abe5adfa0f404e755e89fa2a7e3e136853b5bf120a3ecc32e0e58f581627f9a755ed00b3ae9cfb31467f146e51e6909",
+      "subject": "aps-test:operator",
+      "verification_method": "aps-test:building-owner#key-1",
+      "version": "1.0"
+    },
+    {
+      "authority": {
+        "depth": {
+          "remaining": 0
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-02:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T18:00:00.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:3f1868e184a5b8ba1e6709554bc3461296ddfca00eb10e33457861edfb7b2439",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:operator",
+      "nonce": "13c1213e43fcac7aecb6064413f98a19",
+      "parent_delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "ae4c738029a8163c59b8d367fba01350e930957b6a9aea06149dedcdd29875df99270b4f0cd6d08ba0ba8ada20e71b7a2e7dea9767e3cfa1a2c59aea556bcc0d",
+      "subject": "aps-test:agent",
+      "verification_method": "aps-test:operator#key-1",
+      "version": "1.0"
+    }
+  ],
+  "schema": "ot-authority-case/v1",
+  "work_order": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "delegation_id": "sha256:3f1868e184a5b8ba1e6709554bc3461296ddfca00eb10e33457861edfb7b2439",
+    "delegation_sha256": "684e0d378a9edcd9db17317588e11a3d0d028bba98b4051e53e428471f972e10",
+    "issuer": "testbed-test-key-1",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-work-order/v1",
+    "signature": "FwayoLEvUReABcFjkll0rfNg055xOpmjjv20s0OwNkMVQU-Q0GDB_ozTahLm4s9mt--pP2SW6L6x5ZbAK-SXAg",
+    "valid_from": "2026-01-15T00:00:00Z",
+    "valid_until": "2026-01-15T23:59:59Z",
+    "value_range": {
+      "max": 21.0,
+      "min": 19.0,
+      "unit": "degC"
+    },
+    "work_order_id": "WO-af-4-out-of-scope"
+  }
+}

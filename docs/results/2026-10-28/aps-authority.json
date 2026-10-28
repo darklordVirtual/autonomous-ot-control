@@ -1,0 +1,179 @@
+{
+  "cases": [
+    {
+      "admitted": true,
+      "aps": {
+        "class": "answered",
+        "reason": "scope_covered: chain valid at 2026-01-15T07:00:00.000Z, leaf grants ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+        "verdict": "pass"
+      },
+      "aps_as_expected": true,
+      "case_id": "af-1-valid",
+      "construction": "owner grants operator ZONE-01 and ZONE-02; operator grants agent ZONE-01 until 18:00; call ZONE-01 at 07:00, 20.5 degC",
+      "delegation_fault": null,
+      "expected": {
+        "admitted": true,
+        "aps": "pass",
+        "work_order": "pass"
+      },
+      "oracle": {
+        "reason": "WO-af-1-valid permits 20.5 on ZONE-01; inside contract and budget",
+        "rule": null,
+        "verdict": "permitted"
+      },
+      "oracle_agrees": true,
+      "work_order": {
+        "reasons": [],
+        "verdict": "pass"
+      },
+      "work_order_as_expected": true
+    },
+    {
+      "admitted": false,
+      "aps": {
+        "class": "answered",
+        "reason": "SCOPE_WIDENING@1: child scope is not covered by parent scope",
+        "verdict": "refuse"
+      },
+      "aps_as_expected": true,
+      "case_id": "af-2-widened",
+      "construction": "operator holds ZONE-01 and ZONE-02 but grants the agent ZONE-01 and ZONE-03 (signed directly; the SDK issuer refuses to widen)",
+      "delegation_fault": "widened",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "work_order": "pass"
+      },
+      "oracle": {
+        "reason": "the delegation for WO-af-2-widened is widened",
+        "rule": "delegation_invalid",
+        "verdict": "forbidden"
+      },
+      "oracle_agrees": true,
+      "work_order": {
+        "reasons": [],
+        "verdict": "pass"
+      },
+      "work_order_as_expected": true
+    },
+    {
+      "admitted": false,
+      "aps": {
+        "class": "answered",
+        "reason": "EXPIRED@1: delegation has expired",
+        "verdict": "refuse"
+      },
+      "aps_as_expected": true,
+      "case_id": "af-3-expired",
+      "construction": "the agent's grant for ZONE-01 ends at 06:00 (not_after, exclusive); the decision time is 07:00",
+      "delegation_fault": "expired",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "work_order": "pass"
+      },
+      "oracle": {
+        "reason": "the delegation for WO-af-3-expired is expired",
+        "rule": "delegation_invalid",
+        "verdict": "forbidden"
+      },
+      "oracle_agrees": true,
+      "work_order": {
+        "reasons": [],
+        "verdict": "pass"
+      },
+      "work_order_as_expected": true
+    },
+    {
+      "admitted": false,
+      "aps": {
+        "class": "answered",
+        "reason": "scope_not_covered: leaf does not grant ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+        "verdict": "refuse"
+      },
+      "aps_as_expected": true,
+      "case_id": "af-4-out-of-scope",
+      "construction": "a valid, narrowed chain grants the agent ZONE-02 only; the call is on ZONE-01",
+      "delegation_fault": "out_of_scope",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "work_order": "pass"
+      },
+      "oracle": {
+        "reason": "the delegation for WO-af-4-out-of-scope is out of scope",
+        "rule": "delegation_invalid",
+        "verdict": "forbidden"
+      },
+      "oracle_agrees": true,
+      "work_order": {
+        "reasons": [],
+        "verdict": "pass"
+      },
+      "work_order_as_expected": true
+    },
+    {
+      "admitted": false,
+      "aps": {
+        "class": "answered",
+        "reason": "scope_covered: chain valid at 2026-01-15T07:00:00.000Z, leaf grants ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+        "verdict": "pass"
+      },
+      "aps_as_expected": true,
+      "case_id": "af-5-value-out-of-range",
+      "construction": "valid chain granting ZONE-01; the value 22.5 is outside the work order's 19.0..21.0, which the delegation does not carry",
+      "delegation_fault": null,
+      "expected": {
+        "admitted": false,
+        "aps": "pass",
+        "work_order": "refuse"
+      },
+      "oracle": {
+        "reason": "22.5 is outside WO-af-5-value-out-of-range's range 19.0..21.0 for ZONE-01",
+        "rule": "outside_work_order",
+        "verdict": "forbidden"
+      },
+      "oracle_agrees": true,
+      "work_order": {
+        "reasons": [
+          "value_above_range"
+        ],
+        "verdict": "refuse"
+      },
+      "work_order_as_expected": true
+    }
+  ],
+  "counts": {
+    "admitted": 1,
+    "aps_as_expected": 5,
+    "aps_classes": {
+      "answered": 5,
+      "error": 0,
+      "malformed": 0,
+      "timeout": 0,
+      "unanswered": 0
+    },
+    "cases": 5,
+    "oracle_agrees": 5,
+    "work_order_as_expected": 5
+  },
+  "fixture_set": "aps-1",
+  "note": "Both checks ran on the same captured input. Errors, timeouts, malformed and unanswered verifier answers are their own class: never a refusal, never a catch.",
+  "package_digest": "sha256:cf5cdbf3345b844df6254314f02de001ed3d4ba2141b76355b068d40a26240d6",
+  "pass": true,
+  "reproduced_on": {
+    "harness": "runner.authority_harness",
+    "sandbox": true,
+    "testbed_commit": "4b3e25c",
+    "trust_edge": false
+  },
+  "schema": "ot-authority-result/v1",
+  "set_problems": [],
+  "verifier": {
+    "answer_problems": [],
+    "edge_id": "aps",
+    "project": "Agent Passport System",
+    "runtime_ms": 6831.6,
+    "status": "ok"
+  }
+}

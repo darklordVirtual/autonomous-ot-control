@@ -210,3 +210,14 @@ def test_unknown_and_duplicate_answers_fail_the_run(tmp_path):
     assert "answer for unknown case 'af-9-invented'" in probs and "more than one answer for 'af-1-valid'" in probs
     assert "an answer without a case_id" in probs and not r["pass"]
     assert next(x for x in r["cases"] if x["case_id"] == "af-1-valid")["aps"]["class"] == "malformed"
+
+
+def test_the_sealed_aps_1_set_is_the_assembly_of_the_submission(tmp_path):
+    """APS's submission (PR #35), sealed by this testbed: the committed set checks clean and re-assembling the
+    submission gives the same bytes and the same package digest."""
+    sealed = ROOT / "federation" / "authority" / "fixtures" / "aps-1"
+    assert af.check(sealed) == []
+    again = tmp_path / "aps-1"
+    af.assemble(ROOT / "federation" / "authority" / "submissions" / "aps-1" / "submission.json", again)
+    for f in sorted(p.relative_to(sealed) for p in sealed.rglob("*") if p.is_file()):
+        assert (again / f).read_bytes() == (sealed / f).read_bytes(), f

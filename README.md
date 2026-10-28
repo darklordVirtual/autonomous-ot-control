@@ -97,7 +97,7 @@ aeoess/agent-governance-vocabulary#177, the discussion that motivated this.
 | `runner_validity` | offline | Does the scorer report a failing verifier as a failure, never a pass? | open, report reviewed |
 | `admission_runtime` | inline | `permit` or `refuse` before dispatch, with a reason; consulted only after REMORA and the reviewer approved, can only add refusals | open: harness in the governed demo (`--inline-edge`), reference edge `federation/edges/_inline_template`, scored in the A/B/C report |
 | `tool_definition` | inline | Does the served tool definition match the approved one? | no harness yet. Planned next, against the signed ToolSpec bundle REMORA pins by digest (no MCP gateway needed): the harness hands the edge the served definition and the pinned digest per call, same shape as AgentAvow's `tool_manifest_digest` (E8) |
-| `authority_fixture` | inline | What does a synthetic signed work order authorize? | contract and fixtures pinned ([authority-fixture contract](docs/federation/authority-fixture-contract.md), issue #27); the testbed's own work orders are now Ed25519-signed artifacts, enforced at the dispatcher (SDD-OT-002 SR-05). Awaiting the first external authority edge (APS) |
+| `authority_fixture` | inline | What does a synthetic signed work order authorize? | contract and fixtures pinned ([authority-fixture contract](docs/federation/authority-fixture-contract.md), issue #27); the testbed's own work orders are now Ed25519-signed artifacts, enforced at the dispatcher (SDD-OT-002 SR-05). First external edge: APS's delegation verifier (PR #35), 5/5 on the sealed set `aps-1`, [reproduced here](docs/results/2026-10-28/aps-authority.md) |
 
 </details>
 

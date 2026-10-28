@@ -1,0 +1,122 @@
+{
+  "call": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "decision_time": "2026-01-15T07:00:00Z",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-normalized-call/v1",
+    "unit": "degC",
+    "value": 20.5
+  },
+  "case_id": "af-2-widened",
+  "construction": "operator holds ZONE-01 and ZONE-02 but grants the agent ZONE-01 and ZONE-03 (signed directly; the SDK issuer refuses to widen)",
+  "delegation": [
+    {
+      "authority": {
+        "depth": {
+          "remaining": 1
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+            "ot:demo-building-001:ZONE-02:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T23:59:59.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:building-owner",
+      "nonce": "4683832339816af75723b7ce780fdabe",
+      "parent_delegation_id": null,
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "42a429463f8ac762eb8f00792e7f3de15abe5adfa0f404e755e89fa2a7e3e136853b5bf120a3ecc32e0e58f581627f9a755ed00b3ae9cfb31467f146e51e6909",
+      "subject": "aps-test:operator",
+      "verification_method": "aps-test:building-owner#key-1",
+      "version": "1.0"
+    },
+    {
+      "authority": {
+        "depth": {
+          "remaining": 0
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+            "ot:demo-building-001:ZONE-03:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T18:00:00.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:3d82edbe46fe8956a777928657c47083fedd858124dea214b8014e13010eefb2",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:operator",
+      "nonce": "5a342e174f4d4ac8eb4b7b5d3d2296d1",
+      "parent_delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "1d1c4db7871dcfe023ac55b1da0255f7f73f67f90526128b5d5ad11ceb6b388e56438951107329d84fcf000a3835f6f4bf467b7ba4a170e109ded85f2de2ad00",
+      "subject": "aps-test:agent",
+      "verification_method": "aps-test:operator#key-1",
+      "version": "1.0"
+    }
+  ],
+  "schema": "ot-authority-case/v1",
+  "work_order": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "delegation_id": "sha256:3d82edbe46fe8956a777928657c47083fedd858124dea214b8014e13010eefb2",
+    "delegation_sha256": "f329944dae51d9ac78abad8e5c06c833d2b7eba154e4eed54d48cc6eb8ae0bcc",
+    "issuer": "testbed-test-key-1",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-work-order/v1",
+    "signature": "1iO35m-OtasQKEhgKBTGzQXKrf955YvlZ6q-XG4njEn2xJmdRj_8TYmP7OlUotRiOZ4wO4OYgIgZltHEZiEbDg",
+    "valid_from": "2026-01-15T00:00:00Z",
+    "valid_until": "2026-01-15T23:59:59Z",
+    "value_range": {
+      "max": 21.0,
+      "min": 19.0,
+      "unit": "degC"
+    },
+    "work_order_id": "WO-af-2-widened"
+  }
+}
