@@ -12,7 +12,8 @@ Order of work, as decided for this phase:
 2. SEC-02 and the critical twin interlocks of SEC-03.
 3. The A/B/C additions:
    - attacks on authority, signed work orders and a separate reviewer (a bounded SEC-07; **done**);
-   - all eight oracle rules attacked;
+   - all eight oracle rules attacked (**done**: attack sets `all-rules` and `full`; five-arm run
+     [abc-full](../results/2026-10-28/abc-full.md));
    - AT-09 and AT-12 fault injection (**done**: both PASS on the governed stack).
 4. Simulator fidelity (PR #30 with holdout validation, the hourly model).
 
