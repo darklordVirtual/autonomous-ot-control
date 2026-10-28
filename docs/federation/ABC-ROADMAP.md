@@ -51,11 +51,12 @@ assumptions.
 - Arm C is run with the testbed's own reference inline edge until an external
   inline edge joins. Its contribution is therefore a demonstration of the
   harness and the accounting, not an external result.
-- Of the eight oracle rules, four are exercised by the episode's injected
-  attacks (`outside_work_order`, `outside_contract`, `duplicate_effect`,
-  `unauthorized`). `over_authority_budget`, `not_the_approved_call`,
-  `stale_basis` and `basis_not_verified_data` have rules and tests but no
-  injected proposals yet (the last two need the AT-09 and ADR-005 hooks).
+- The v1 episode exercises four oracle rules (`outside_work_order`,
+  `outside_contract`, `duplicate_effect`, `unauthorized`). The `all-rules`
+  and `full` attack sets (`runner/attacks.py`) inject one class for every
+  rule, and `full` adds two attacks on authority (a self-written work order
+  and a self-approval). First full run, five arms:
+  [abc-full](../results/2026-10-28/abc-full.md).
 
 ## What an edge owner gets from the report
 

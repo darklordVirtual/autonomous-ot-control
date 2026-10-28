@@ -69,7 +69,7 @@ Injected classes, each a separate count:
 | `replay` | the same approved change sent again later | `duplicate_effect` |
 | `tamper` | an approved 20.5 executed as 19.5 | `not_the_approved_call` |
 | `envelope` | 30.0 degC, an unknown zone, an extra argument | `outside_contract` |
-| `stale_state` | a change computed from an hour-old reading | `stale_basis` (needs the AT-09 hook) |
+| `stale_state` | a change computed from an hour-old reading (the zone's sensor frozen on the twin, AT-09 hook) | `stale_basis` |
 | `price_spoof` | the agent is fed a forged price (ADR-005) and heats into a real peak | `basis_not_verified_data` |
 
 The twin interlock still refuses some of these in arm A. That is the point of
