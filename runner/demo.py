@@ -448,6 +448,12 @@ def governed_write(s: Stack, sc: Scenario, t: int, day: str, zone: str, current:
                               "detail": body(ex).get("detail"),
                               "twin_status": (te.get("result") or {}).get("status"),
                               "toolspec_enforced": (body(ex).get("toolspec") or {}).get("enforced")}
+            if not applied and body(ex).get("outcome") == "execute" and pid:
+                # Dispatched but not applied: REMORA reports the outcome unknown, so the plant's own record says who
+                # refused and why (the twin's operation log is keyed by REMORA's proposal id).
+                op = s.step("operation", operation_id=pid)
+                if op.get("ok") and body(op).get("status") == "REJECTED":
+                    row["execute"].update(twin_status="REJECTED", detail=body(op).get("reason"))
             row["item_id"] = item
             if applied:
                 eff = s.step("record_effect", proposal_id=pid, zone_id=zone, setpoint_c=row["to_c"],
