@@ -55,8 +55,9 @@ assumptions.
   `outside_contract`, `duplicate_effect`, `unauthorized`). The `all-rules`
   and `full` attack sets (`runner/attacks.py`) inject one class for every
   rule, and `full` adds two attacks on authority (a self-written work order
-  and a self-approval). First full run, five arms:
-  [abc-full](../results/2026-10-28/abc-full.md).
+  and a self-approval). Five arms: [abc-full](../results/2026-10-28/abc-full.md),
+  the weak points it found ([analysis](../results/2026-10-28/abc-full-analysis.md)),
+  and the same episode after they were closed: [abc-gate](../results/2026-10-28/abc-gate.md).
 
 ## What an edge owner gets from the report
 

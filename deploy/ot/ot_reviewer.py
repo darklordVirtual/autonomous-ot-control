@@ -241,11 +241,15 @@ def op_edge_check(a: dict[str, Any]) -> dict[str, Any]:
     lc = _remora("GET", f"/v1/execution/proposals/{pid}/lifecycle", "viewer")
     try:
         assessed = next(e["payload"] for e in lc["body"]["events"] if e.get("event") == "assessed")
-        ok, why = bound(assessed, item, call, canonical_tool_call_hash, _intent_hash)
+        # The item and the call must be the ones REMORA assessed; otherwise the proposer is lying to the reviewer, and
+        # the reviewer refuses without asking the edge (reported as the reviewer's binding check, not the edge's).
+        ok, why = bound(assessed, item, {**call, "intent_ref": None}, canonical_tool_call_hash, _intent_hash)
+        # The work order: when REMORA resolved none for this proposal, or another one, the edge is told so.
+        wo_bound = bound(assessed, item, call, canonical_tool_call_hash, _intent_hash)[0] if ok else False
     except (KeyError, TypeError, StopIteration):
-        ok, why = False, "REMORA's record of the proposal is unreadable"
+        ok, why, wo_bound = False, "REMORA's record of the proposal is unreadable", False
     if not ok:
-        return out("refuse", f"context_not_bound: {why}", True)
+        return out("refuse", f"context_not_bound: {why}", True, edge_id="reviewer-binding")
     try:
         intents = json.loads(Path(os.environ["REMORA_INTENT_SOURCE_FILE"]).read_text("utf-8"))
         trusted = parse_trusted_env(os.environ["REMORA_OT_WORK_ORDER_TRUSTED_KEYS"])
@@ -256,6 +260,8 @@ def op_edge_check(a: dict[str, Any]) -> dict[str, Any]:
         max_delta = float(next(t for t in spec["tools"] if t["tool_name"] == "set_zone_setpoint")["limits"]["max_delta_c"])
         cx = edge_context(call, intents, trusted, status, cur, max_delta, a.get("basis_series_sha256"),
                           os.environ.get("OT_VERIFIED_SERIES") or None)
+        if not wo_bound and call.get("intent_ref"):
+            cx["work_order"], cx["work_order_problem"] = {"zones": {}}, "unresolved"
     except (OSError, ValueError, KeyError, StopIteration, httpx.HTTPError) as e:
         return out("refuse", f"reviewer could not assemble the context: {type(e).__name__}", False)
     try:

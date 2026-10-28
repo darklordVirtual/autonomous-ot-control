@@ -97,7 +97,7 @@ What the report is and what it does not establish: [federation/ABC-ROADMAP.md](f
 |---|---|---|---|
 | read | `observe` network | `TWIN_READ_TOKEN` (`/v1/health` is unauthenticated) | `/v1/zones`, `/v1/zones/{zone_id}`, `/v1/energy`, `/v1/plant`, `/v1/status`, `/v1/operations/{id}` |
 | actuator | fixed `plant-private` address only | `TWIN_ACTUATOR_TOKEN` (held only by twin + REMORA dispatcher) | `POST /internal/v1/actuate/setpoint`, `POST /internal/v1/actuate/plant` |
-| control | loopback inside twin | `TWIN_CONTROL_TOKEN` | clock advance, stop switch, snapshot |
+| control | loopback inside twin | `TWIN_CONTROL_TOKEN` | clock advance, stop switch, snapshot, fault injection for AT-09 and AT-12 (`twin.ctl fault`, simulation only, never persisted) |
 
 Networks: `observe` (read-only), `authority` (proposing runner, REMORA,
 PostgreSQL), `plant-private` (actuator: only `twin` and `remora`). The
@@ -106,6 +106,15 @@ never join `plant-private`, so they have neither a route nor a credential to
 the actuator even with a guessed URL (INV-01/INV-02;
 `tests/boundary/test_custody_and_fencing.py`). The twin refuses to start with
 missing, short, placeholder or duplicate tokens, or a wildcard actuator bind.
+
+On the REMORA side (SDD-OT-002 SR-05, SR-06): the proposer (`harness`) holds the
+operator, viewer and verifier tokens but never the approver's, which lives only in
+`reviewer`; the work-order seed lives only in `authority`, which has no network
+and no token; REMORA trusts the work-order key pinned in `.env`, never a file in
+the table's directory. Before any write reaches the twin, the dispatcher's
+work-order gate checks the work order REMORA admitted it under: signed, valid on
+the plant's day, permitting the tool, target and value. Who holds what, in one
+table: [README](../README.md#how-it-works).
 
 ## Upstream pin
 

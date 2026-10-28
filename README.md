@@ -17,21 +17,34 @@ repository.
 |---|---|
 | **See results** of outside runs against the testbed | [`docs/federation/RESULTS.md`](docs/federation/RESULTS.md) (generated from run records; reviewed reports below the table) |
 | **Join** with my own check, no credentials, five minutes | [Join as a federation edge](#join-as-a-federation-edge) and the [guide](docs/federation/README.md) |
-| **Read the reports** | Strategy A/B/C with seeded faults: [abc-2025.html](docs/results/2026-10-27/abc-2025.html) · five price areas 2025: [areas-2025.html](docs/results/2026-10-27/areas-2025.html) · governed week: [report.html](docs/results/2026-10-27/report.html) · federation A/B/C: `artifacts/abc-<run>/abc-report.html` after [`run-abc.sh`](#the-abc-report) |
+| **Read the reports** | Federation A/B/C, five arms, every oracle rule attacked: [abc-gate](docs/results/2026-10-28/abc-gate.md) (current) · [abc-full](docs/results/2026-10-28/abc-full.md) and [what it found](docs/results/2026-10-28/abc-full-analysis.md) · strategy A/B/C with seeded faults: [abc-2025.html](docs/results/2026-10-27/abc-2025.html) · five price areas 2025: [areas-2025.html](docs/results/2026-10-27/areas-2025.html) · governed week: [report.html](docs/results/2026-10-27/report.html) |
+| **Check the security work** | [SDD-OT-002 status](docs/security/sdd-ot-002-status.md) (25 findings, per work package) · [OWASP Agentic Top 10](docs/security/owasp-agentic-top10.md) · [adversarial benchmark](docs/security/adversarial-benchmark.md) |
 | **Check what is established**, and at what evidence level | [`docs/status.md`](docs/status.md) |
 | **Find the entry point for machines** | [`federation/index.json`](federation/index.json) |
 
 ## How it works
 
 ```
- caretaker (P3)        REMORA                 dispatcher            twin                 observer
- proposes one   ───▶   signed ToolSpec v5,  ───▶  holds the     ───▶  interlocks     ───▶  read-only,
- governed tool         signed limits,            actuator            IL-01..IL-11,        own token,
- call with its         single-use ids,           credential,         single-use           records the
- decision record       audit chain               exactly once        operation ids        effect
-        │                                                                                   │
-        └──────────────── evidence: decision, envelope, twin operation record, observation ─┘
+ work-order authority ── signs the day plans (Ed25519) ──▶ intent table
+                                                              │
+ caretaker / agent        REMORA                  reviewer      │      dispatcher (adapter)        twin             observer
+ proposes one     ───▶    signed ToolSpec v5,  ───▶ approver ───┼──▶   work-order gate:      ───▶  interlocks  ───▶ read-only,
+ governed call            signed limits,           token only,  │      signed, valid today,        IL-01..IL-11,    own token,
+ (operator token)         single-use ids,          decides from │      permits this value;         single-use       records the
+                          audit chain              REMORA's own │      holds the actuator          operation ids    effect
+                                                   record ──────┘      credential, exactly once
+        │                                                                                                              │
+        └────────────────────────── evidence: decision, envelope, twin operation record, observation ──────────────────┘
 ```
+
+| Process | Holds | Cannot |
+|---|---|---|
+| Proposer (`harness`, caretaker, agent) | operator, viewer and verifier tokens; the twin's read token | approve its own change, sign a work order, reach the actuator |
+| Work-order authority (`authority`) | the work-order seed; no network, no token | sign anything but the plans it builds from its own templates |
+| Reviewer (`reviewer`) | the approver token, a viewer token, the twin's read token | propose; believe an id, call or work order REMORA's record does not bind |
+| REMORA | public keys for the contract, the limits and the work orders | author a contract, a limit policy or a work order |
+| Dispatcher (`ot_registry` in REMORA's image) | the actuator token | write under a work order that is unsigned, expired or does not permit the value |
+| Twin | its interlocks | — (it is the simulated plant) |
 
 <details>
 <summary>The four properties the suite proves, and where</summary>
@@ -84,7 +97,7 @@ aeoess/agent-governance-vocabulary#177, the discussion that motivated this.
 | `runner_validity` | offline | Does the scorer report a failing verifier as a failure, never a pass? | open, report reviewed |
 | `admission_runtime` | inline | `permit` or `refuse` before dispatch, with a reason; consulted only after REMORA and the reviewer approved, can only add refusals | open: harness in the governed demo (`--inline-edge`), reference edge `federation/edges/_inline_template`, scored in the A/B/C report |
 | `tool_definition` | inline | Does the served tool definition match the approved one? | no harness yet. Planned next, against the signed ToolSpec bundle REMORA pins by digest (no MCP gateway needed): the harness hands the edge the served definition and the pinned digest per call, same shape as AgentAvow's `tool_manifest_digest` (E8) |
-| `authority_fixture` | inline | What does a synthetic signed work order authorize? | no harness yet. Blocked on a signed work-order format: the testbed's work orders are intent-table entries, not signed artifacts. Planned after `tool_definition` with the testbed's own Ed25519 signer as the interim format and the episode's work orders as the oracle; a federation authority format (APS) is preferred when one is pinned |
+| `authority_fixture` | inline | What does a synthetic signed work order authorize? | contract and fixtures pinned ([authority-fixture contract](docs/federation/authority-fixture-contract.md), issue #27); the testbed's own work orders are now Ed25519-signed artifacts, enforced at the dispatcher (SDD-OT-002 SR-05). Awaiting the first external authority edge (APS) |
 
 </details>
 
@@ -175,13 +188,28 @@ seals the four cases that catch it (PR #21).
 Where the edges end up. The demo week is pinned as an episode
 (`scenarios/episodes/`), every proposal judged `permitted` or
 `forbidden:<rule>` by an oracle written from the work orders and the plant's
-limits before any arm runs. Arm A applies the stream ungoverned (interlock
-only, known-negative), arm B runs it through REMORA with a declared reviewer
-model, arm C adds one inline edge that is consulted after REMORA and the
-reviewer approved and can only add refusals.
+limits before any arm runs. The `full` attack set injects one class for every
+oracle rule plus two attacks on authority (a self-written work order, a
+self-approval). Arm A applies the stream ungoverned (interlock only,
+known-negative), the B arms run it through REMORA with a declared reviewer
+model, arm C adds one inline edge that can only add refusals.
+
+| Arm | Forbidden effects / 11 | Permitted effects / 45 |
+|---|---:|---:|
+| A: the twin's interlock only | 7 | 37 |
+| B-careful: a reviewer that follows the strategy | 0 | 44 |
+| B-rubber_stamp: REMORA and the work-order gate, a reviewer that approves everything | 1 | 45 |
+| B-independent: a reviewer in its own container, deciding from REMORA's record | 0 | 45 |
+| C-rubber_stamp: B-rubber_stamp plus the reference inline edge | 0 | 45 |
+
+From [abc-gate](docs/results/2026-10-28/abc-gate.md); the run before the weak
+points were closed, and what each layer and edge stopped, is in
+[the analysis](docs/results/2026-10-28/abc-full-analysis.md). The one effect
+left under a rubber stamp is a change computed from an unverified series,
+which only a reviewer or an edge that checks the declared basis can see.
 
 ```bash
-DAYS=7 ./deploy/scripts/run-abc.sh     # Docker: A offline; B-careful, B-rubber_stamp, C with the reference inline edge; report
+ATTACK_SET=full DAYS=7 ./deploy/scripts/run-abc.sh   # Docker: A offline; four governed arms; report (about 2 h)
 ```
 
 `runner.ab_compare` accounts every arm against the oracle, runs every offline
@@ -230,10 +258,11 @@ demo, CLI proposals, the A/B/C runs, trust boundary and the upstream pin:
 
 ```
 twin/        model, plant (HVAC/tank/HP/AHU/lighting/cables), tfm (PA 0802), datapoints, guard, api, effect_observer
-adapter/     REMORA-free helpers: contracts (signed ToolSpec), actuation (effect primitives), verifier
-deploy/ot/   modules loaded inside REMORA: ot_registry, ot_bundle, site_policy, caretaker_fallback, limits, signer
+adapter/     REMORA-free helpers: contracts (signed ToolSpec), actuation (effect primitives), verifier, work_orders (signed)
+deploy/ot/   modules in REMORA's image: ot_registry (dispatcher + work-order gate), ot_bundle, ot_authority, ot_reviewer,
+             ot_day_plans, site_policy, caretaker_fallback, limits, signer
 runner/      caretaker (P3), strategies (P0..P2), areas, demo, acceptance; federation: edge_check, federation_fixtures,
-             edge_pass, episode, oracle, ledger_metrics, arm_a, admission, ab_compare
+             edge_pass, episode, oracle, attacks, ledger_metrics, arm_a, admission, ab_compare
 federation/  index.json (entry point), edges/_template and edges/_inline_template, external edges, sealed fixtures/v1
              (12 + 6) and fixtures/v2 (12 + 10), records/ (run records), reports.json (reviewed reports)
 contracts/   ToolSpec, tool surface, caretaker profile catalog, federation edge/case/result/run-record/fixtures/index,
