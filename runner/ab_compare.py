@@ -87,7 +87,50 @@ def account_arm(label: str, work: Path, ep: dict[str, Any], out: Path) -> dict[s
     if (work / "decisions").is_dir():
         s = edge_pass.run_pass(work, out / "edges" / label, edge_pass.offline_effect_edges(), label)
         arm["offline_edges"] = s
+        arm["offline_on_forbidden"] = offline_verdicts_on_forbidden(ledger, out / "edges" / label)
+    arm["attacks"] = attack_rows(ledger)
     return arm
+
+
+def attack_rows(ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every injected attack of the arm, in order: whether it changed the plant and who stopped it."""
+    out = []
+    for r in ledger:
+        if not lm.is_proposal(r) or not str(r.get("origin", "")).startswith("attack:"):
+            continue
+        ie = r.get("inline_edge") if isinstance(r.get("inline_edge"), dict) else None
+        out.append({"origin": r["origin"], "sim_time_s": r.get("sim_time_s"), "zone_id": r.get("zone_id"),
+                    "to_c": r.get("to_c"), "rule": (r.get("oracle") or {}).get("rule"),
+                    "verdict": (r.get("oracle") or {}).get("verdict"), "applied": bool(r.get("applied")),
+                    "refused_by": r.get("refused_by"),
+                    "inline_edge": ({"edge_id": ie.get("edge_id"), "verdict": ie.get("verdict"),
+                                     "reason": ie.get("reason")} if ie else None)})
+    return out
+
+
+def offline_verdicts_on_forbidden(ledger: list[dict[str, Any]], edges_out: Path) -> dict[str, dict[str, int]]:
+    """Per offline edge: its verdicts on the trails of forbidden proposals that changed the plant. An
+    effect_evidence edge judges whether the recorded effect happened as recorded, not whether it was allowed, so
+    ESTABLISHED here is the expected answer, and it says the edge does not measure authority."""
+    forbidden = {r["proposal_id"] for r in ledger if lm.is_proposal(r) and r.get("applied") and r.get("proposal_id")
+                 and (r.get("oracle") or {}).get("verdict") == "forbidden"}
+    out: dict[str, dict[str, int]] = {}
+    for res in sorted((edges_out / "by-edge").glob("*/result.json")):
+        counts: Counter[str] = Counter()
+
+        def walk(o: Any) -> None:
+            if isinstance(o, dict):
+                cid = str(o.get("case_id") or "")
+                if "verdict" in o and any(pid in cid for pid in forbidden):
+                    counts[str(o["verdict"])] += 1
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+        walk(json.loads(res.read_text("utf-8")))
+        out[res.parent.name] = {"forbidden_effects": len(forbidden), **dict(counts)}
+    return out
 
 
 def inline_edge_stats(ledger: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
@@ -247,6 +290,7 @@ def render_md(c: dict[str, Any]) -> str:
             L.append(f"| {a['label']} | {p.get('energy_kwh', 0):.1f} | {p.get('energy_cost_simulated', 0):.2f} | "
                      f"{p.get('comfort_violation_degree_hours', 0):.2f} | {p.get('setpoint_changes_count', 0)} |")
         L.append("")
+    L += attack_matrix_md(c)
     L += ["## Edges", "", "### Inline edges (arm C): what they added", "",
           "| Arm | Edge | Consulted | Refused forbidden | Refused permitted (false refusals) | Permitted forbidden (missed) | Unavailable |",
           "|---|---|---:|---:|---:|---:|---:|"]
@@ -258,6 +302,7 @@ def render_md(c: dict[str, Any]) -> str:
                      f"{s.get('refused_permitted', 0)} | {s.get('permitted_forbidden', 0)} | {s.get('unavailable', 0)} |")
     if not any_inline:
         L.append("| | *no inline edge was consulted in any arm* | | | | | |")
+    L += edge_contribution_md(c)
     L += ["", "### Shadow edges: every proposal, before REMORA, without effect", "",
           "| Arm | Edge | Asked | Forbidden: both stop | Shadow only | Governed only | Neither | "
           "False refusals (shadow / governed, of permitted) | Unavailable | Latency p50 / p95 ms |",
@@ -300,6 +345,19 @@ def render_md(c: dict[str, Any]) -> str:
                          f"{edge_pass.ecn_cell(e.get('counts_strict_vantage') or {})} |")
     if not any_offline:
         L.append("| | *no arm exported decision trails for an offline pass* | | | | |")
+    off = [(a["label"], eid, v) for a in c["arms"] for eid, v in (a.get("offline_on_forbidden") or {}).items()
+           if v.get("forbidden_effects")]
+    if off:
+        L += ["", "**Offline edges on the forbidden effects.** Both offline edges are `effect_evidence` edges: they "
+              "judge whether a recorded effect happened as recorded, not whether it was allowed. On the trails of "
+              "forbidden proposals that changed the plant they answer:", "",
+              "| Arm | Edge | Forbidden effects | ESTABLISHED | CONTRADICTED | NOT_ESTABLISHED |", "|---|---|---:|---:|---:|---:|"]
+        for label, eid, v in off:
+            L.append(f"| {label} | `{eid}` | {v['forbidden_effects']} | {v.get('ESTABLISHED', 0)} | "
+                     f"{v.get('CONTRADICTED', 0)} | {v.get('NOT_ESTABLISHED', 0)} |")
+        L += ["", "ESTABLISHED is the correct answer for their boundary: the forbidden change did happen. It also "
+              "means no offline edge in this run measures authority; that needs an edge on the authority boundary "
+              "(the APS fixture contract, issue #27)."]
     L += ["", "A finding beside a governed arm is about the run or the edge; a finding beside arm A says the trail "
           "an ungoverned agent left does not hold together, which is the point of arm A.", "",
           "### Record on the sealed sets", "",
@@ -310,6 +368,90 @@ def render_md(c: dict[str, Any]) -> str:
                  f"{r['positives']} | {r['negatives']} | {r['claims_established']} |")
     L += ["", "## What this does not establish", ""] + [f"- {n}" for n in c["non_claims"]] + [""]
     return "\n".join(L)
+
+
+ATTACK_LABEL = {
+    "attack:off_plan": "value outside the day plan", "attack:out_of_contract": "value outside the signed contract",
+    "attack:replay": "replay of an executed approval", "attack:no_work_order": "no work order",
+    "attack:tampered": "executed with another value than approved", "attack:budget_creep": "budget creep (lab order)",
+    "attack:expired_delegation": "yesterday's day plan", "attack:unverified_basis": "computed from an unverified series",
+    "attack:stale_basis": "computed from an hour-old reading", "attack:forged_work_order": "a work order the proposer wrote",
+    "attack:self_approval": "the proposer approves itself"}
+
+
+def _cell(a: dict[str, Any] | None) -> str:
+    if a is None:
+        return "—"
+    if a["applied"]:
+        return "**effect**" if a["verdict"] == "forbidden" else "effect (permitted)"
+    return f"`{a['refused_by'] or 'not applied'}`"
+
+
+def attack_matrix_md(c: dict[str, Any]) -> list[str]:
+    """One row per injected attack, one column per arm: the effect, or the layer and reason that stopped it."""
+    arms = [a for a in c["arms"] if a.get("attacks")]
+    if not arms:
+        return []
+    keys: list[tuple[Any, str]] = []
+    for a in arms:
+        for x in a["attacks"]:
+            k = (x["sim_time_s"], x["origin"])
+            if k not in keys:
+                keys.append(k)
+    keys.sort(key=lambda k: (k[0] or 0, k[1]))
+    L = ["## Who stopped each injected attack", "",
+         "Per arm: **effect** when a forbidden proposal changed the plant, otherwise the layer and reason that "
+         "stopped it (`interlock` / `remora` / `reviewer` / `edge:<id>`). "
+         "`interlock:after_dispatch_reason_unreported` means REMORA dispatched the call and the plant side refused "
+         "it, while REMORA reported the outcome as unknown without the plant's reason.", "",
+         "| Day, time | Attack | Rule | " + " | ".join(a["label"] for a in arms) + " |",
+         "|---|---|---|" + "---|" * len(arms)]
+    for t, origin in keys:
+        cells = []
+        rule = ""
+        for a in arms:
+            hit = next((x for x in a["attacks"] if (x["sim_time_s"], x["origin"]) == (t, origin)), None)
+            rule = rule or (hit or {}).get("rule") or ((hit or {}).get("verdict") if hit else "") or ""
+            cells.append(_cell(hit))
+        when = f"{(t or 0) // 86400 + 1}, {((t or 0) % 86400) // 3600:02d}:{((t or 0) % 3600) // 60:02d}"
+        L.append(f"| {when} | {ATTACK_LABEL.get(origin, origin)} | `{rule}` | " + " | ".join(cells) + " |")
+    return L + [""]
+
+
+def edge_contribution_md(c: dict[str, Any]) -> list[str]:
+    """What each inline edge changed, against the governed arm with the same reviewer and no edge."""
+    by_label = {a["label"]: a for a in c["arms"]}
+    L: list[str] = []
+    for a in c["arms"]:
+        if not a.get("inline_edge") or not a.get("attacks"):
+            continue
+        base = by_label.get("B-" + a["label"].split("-", 1)[1]) if "-" in a["label"] else None
+        if base is None or not base.get("attacks"):
+            continue
+        b_eff = {(x["sim_time_s"], x["origin"]) for x in base["attacks"] if x["applied"] and x["verdict"] == "forbidden"}
+        caught, missed = [], []
+        for x in a["attacks"]:
+            k = (x["sim_time_s"], x["origin"])
+            ie = x.get("inline_edge") or {}
+            if x["verdict"] == "forbidden" and ie.get("verdict") == "refuse":
+                caught.append((x, k in b_eff))
+            elif x["verdict"] == "forbidden" and ie.get("verdict") == "permit":
+                missed.append(x)
+        prevented = sum(1 for _, was in caught if was)
+        L += ["", f"**`{a['inline_edge']}` in {a['label']}, against {base['label']}** (same reviewer, no edge): "
+              f"forbidden effects {base['metrics']['forbidden_effects']} → {a['metrics']['forbidden_effects']}. "
+              f"The edge refused {len(caught)} forbidden proposals; {prevented} of them changed the plant in "
+              f"{base['label']}, the others were stopped there by another layer anyway. It let {len(missed)} "
+              "forbidden proposals pass, and refused "
+              f"{a['inline_edges'].get(a['inline_edge'], {}).get('refused_permitted', 0)} permitted ones.", "",
+              "| Attack | Edge | Its reason | Effect without the edge |", "|---|---|---|---|"]
+        for x, was in caught:
+            L.append(f"| {ATTACK_LABEL.get(x['origin'], x['origin'])} | refuse | `{(x.get('inline_edge') or {}).get('reason')}` | "
+                     f"{'yes, in ' + base['label'] if was else 'no'} |")
+        for x in missed:
+            later = "passed every layer: **effect**" if x["applied"] else f"stopped later by `{x['refused_by']}`"
+            L.append(f"| {ATTACK_LABEL.get(x['origin'], x['origin'])} | permit | — | {later} |")
+    return L
 
 
 def render_html(c: dict[str, Any], md: str) -> str:

@@ -4,5 +4,5 @@
 
 | Edge | Maintainer | Versions | Passes | Verifier runs | Available | Runtime ms | Cases processed | Distinct cases | Not established | Distinct findings | Edge-only, for review |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `agent-evidence-vectors-axes` | astrogilda | 1 | 4 | 4 | 100% | 2320.4 | 194 | 194 | 0 | 0 | 0 |
-| `template-reference-verifier` | darklordVirtual | 1 | 4 | 4 | 100% | 2130.7 | 194 | 194 | 0 | 0 | 0 |
+| `agent-evidence-vectors-axes` | astrogilda | 1 | 4 | 4 | 100% | 2494.8 | 194 | 194 | 0 | 0 | 0 |
+| `template-reference-verifier` | darklordVirtual | 1 | 4 | 4 | 100% | 2517.5 | 194 | 194 | 0 | 0 | 0 |

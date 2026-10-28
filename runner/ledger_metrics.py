@@ -59,6 +59,12 @@ def refused_by(row: dict[str, Any]) -> str | None:
     if isinstance(ex, dict):
         if ex.get("twin_status") == "REJECTED":
             return f"interlock:{_short(ex.get('detail') or 'rejected')}"
+        if ex.get("outcome") == "execute" and ex.get("status") == 200 and ex.get("twin_status") is None:
+            # REMORA dispatched the call and the plant side refused it (the adapter or the twin's interlock); REMORA
+            # reports that as an unknown outcome without the plant's reason. Before 2026-10-28 this was counted
+            # as REMORA's refusal. Runs since then record the twin's own reason (runner.demo), so this label is
+            # left only on older ledgers.
+            return "interlock:after_dispatch_reason_unreported"
         return f"remora:{_short(ex.get('detail') or ex.get('outcome') or 'not_executed')}"
     if row.get("decision") and row.get("decision") not in ("accept",) and not row.get("item_id"):
         return f"remora:{_short(row.get('decision'))}"
