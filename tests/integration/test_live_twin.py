@@ -32,9 +32,23 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def _distinct_listener_ports() -> dict[str, int]:
+    """Reserve all three ports together, so the OS cannot assign one twice."""
+    held: list[tuple[str, socket.socket]] = []
+    try:
+        for name in ("read", "act", "ctl"):
+            sock = socket.socket()
+            sock.bind(("127.0.0.1", 0))
+            held.append((name, sock))
+        return {name: sock.getsockname()[1] for name, sock in held}
+    finally:
+        for _, sock in held:
+            sock.close()
+
+
 @pytest.fixture
 def live(tmp_path):
-    ports = {"read": _free_port(), "act": _free_port(), "ctl": _free_port()}
+    ports = _distinct_listener_ports()
     env = os.environ | TEST_ENV | {
         "TWIN_READ_BIND": "127.0.0.1", "TWIN_READ_PORT": str(ports["read"]),
         "TWIN_ACTUATOR_BIND": "127.0.0.1", "TWIN_ACTUATOR_PORT": str(ports["act"]),
@@ -42,30 +56,54 @@ def live(tmp_path):
         "TWIN_SNAPSHOT_PATH": str(tmp_path / "snap.json"), "PYTHONPATH": str(ROOT),
     }
     procs: list[subprocess.Popen] = []
+    launches = 0
 
     def start() -> None:
-        p = subprocess.Popen([sys.executable, "-m", "twin.server"], cwd=ROOT, env=env,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        nonlocal launches
+        launches += 1
+        log_path = tmp_path / f"twin-start-{launches}.log"
+        # Do not hide a subprocess failure. A file avoids PIPE deadlocks and
+        # allows CI to report why the listener failed to bind or initialize.
+        with log_path.open("w") as log:
+            p = subprocess.Popen([sys.executable, "-m", "twin.server"], cwd=ROOT, env=env,
+                                 stdout=log, stderr=subprocess.STDOUT)
         procs.append(p)
-        deadline = time.monotonic() + 15
+        deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
+            if p.poll() is not None:
+                break
             try:
                 if httpx.get(f"http://127.0.0.1:{ports['act']}/internal/v1/health", timeout=0.5).is_success:
                     return
             except httpx.HTTPError:
-                time.sleep(0.1)
-        raise RuntimeError("twin did not start")
+                pass
+            time.sleep(0.1)
+
+        exit_code = p.poll()
+        if exit_code is None:
+            p.terminate()
+            try:
+                p.wait(5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait(5)
+        procs.remove(p)
+        output = log_path.read_text(errors="replace")[-4000:]
+        raise RuntimeError(f"twin did not start (exit={exit_code}, ports={ports}):\\n{output}")
 
     def stop() -> None:
         while procs:
             p = procs.pop()
-            p.terminate()
+            if p.poll() is None:
+                p.terminate()
             p.wait(10)
 
     start()
     urls = {k: f"http://127.0.0.1:{v}" for k, v in ports.items()}
-    yield urls, start, stop
-    stop()
+    try:
+        yield urls, start, stop
+    finally:
+        stop()
 
 
 def _act(urls, body):
