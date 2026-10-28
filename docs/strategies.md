@@ -60,31 +60,46 @@ python -m runner.areas --seeds 177 178 179 --out artifacts/areas-2025
 ## Results on a calibrated building: SITE_001, NO1 2025 (ADR-011)
 
 The same strategies on the twin calibrated to a measured Oslo office
-(3 562 m², 1980, ground-source heat pump; `docs/calibration.md`), three
-seeds, priced on Elvia's published 2026 sheet for large low-voltage
-customers (effektledd 111 NOK/kW/month Oct–Mar, 46 Apr–Sep; `runner/tariffs.py`).
+(3 562 m², 1980, ground-source heat pump; `docs/calibration.md`), its plant
+sized from the design heat load (`site-001-v3`), three seeds, the peak
+budget at 60 kW, priced on Elvia's published 2026 sheet for large
+low-voltage customers (effektledd 111 NOK/kW/month Oct–Mar, 46 Apr–Sep;
+`runner/tariffs.py`).
 The full pack with every table, the seed ranges, the monthly peaks, the
 tariff sensitivity and the evidence digests:
 [`results/2026-10-28/pilot-site-001/pilot.html`](results/2026-10-28/pilot-site-001/pilot.html)
 ([md](results/2026-10-28/pilot-site-001/pilot.md)); the interactive page:
 [`demo.html`](results/2026-10-28/pilot-site-001/demo.html).
 
-PILOT_TABLE
+| Strategy | Cost (NOK) | Saving (NOK) | Saving (%) | kWh | Saving (kWh) | Winter peak (kW) | Backup (kWh) | Comfort (dh) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| P0 as found | 244 933 | – | – | 187 842 | – | 105 | 12 791 | 0 |
+| P1 | 225 055 | 19 878 (19 162..20 517) | 8.1 % | 188 206 | -363 (-0.2 %) | 85 | 13 091 | 0 |
+| P2 | 216 383 | 28 550 (28 107..29 023) | 11.7 % | 173 399 | 14 443 (7.7 %) | 90 | 14 533 | 0 |
+| P3 caretaker | 217 316 | 27 617 (27 173..28 062) | 11.3 % | 174 377 | 13 465 (7.2 %) | 90 | 15 685 | 44 |
+| **P3pb caretaker + peak budget** | 200 133 | 44 800 (44 238..45 216) | 18.3 % | 165 613 | 22 229 (11.8 %) | 76 | 5 311 | 45 |
 
-**Read it with care.** On this building the money is in the grid tariff's
-power part, not in kWh: the as-found control sets the month's highest
-hourly mean with the heat pump recovering after a setback, and the peak
-budget is what moves it. The kWh saving is lighting (presence and
-daylight) and a better heat-pump COP at the lower tank temperature; the
-cable lever of the demo building does not exist here. The calibration is
-in-sample and monthly, P0 is the testbed's generic as-found control, not
-the site's sequence, and whether the real compressor can be capped is a
-site question: the pack's scope section lists every such item. None of
-this is a measured saving.
+**Read it with care.** On this building, as sized from its certificate
+(a 58 kW ground-source heat pump with a 48 kW direct-electric backup,
+`docs/calibration.md`), the month's highest hourly mean is set by the
+backup heater firing for a recovery after a setback. The budget's value
+here is not the compressor cap, which almost never binds, but a heat-pump
+-only recovery: the buffer setpoint never asks for more than the compressor
+can hold, and the setback is only as deep as the learned reheat rate
+recovers before occupancy. That cuts the backup heater by more than half
+and the shoulder-month peaks by a third; January and February stay at the
+compressor's limit, where the comfort guard restores the backup. The kWh
+saving is lighting (presence and daylight) and the avoided backup at
+COP 1. The calibration is in-sample and monthly, P0 is the testbed's
+generic as-found control, not the site's sequence, and the plant's size is
+a stated assumption until the site's winter hourly maxima are measured:
+the pack's scope section lists every such item. None of this is a
+measured saving.
 
 Reproduce without Docker (about 30 minutes on two cores):
 
 ```bash
-python -m runner.pilot --config twin/fixtures/calibrated/site-001-v2.json --area NO1 \
-    --seeds 177 178 179 --strategies P0 P1 P2 P3 P3pb --peak-budget-kw 70 --out artifacts/pilot-site-001
+python -m runner.pilot --config twin/fixtures/calibrated/site-001-v3.json --area NO1 \
+    --seeds 177 178 179 --strategies P0 P1 P2 P3 P3pb --peak-budget-kw 60 \
+    --monthly-check docs/results/2026-10-28/pilot-site-001/monthly-check-v3.json --out artifacts/pilot-site-001
 ```

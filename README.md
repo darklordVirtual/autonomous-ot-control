@@ -149,13 +149,15 @@ on unmeasured assumptions of the twin and is not the figure to quote. Each
 report opens with what drives the number. Tables, definitions of P0–P3 and the
 arms, and the reports: [`docs/strategies.md`](docs/strategies.md).
 
-**On a building calibrated to its own meters** (`site-001-v2`: a 3 562 m²
-Oslo office, ground-source heat pump, monthly CV(RMSE) 11.8 % against the
-site's meters, in-sample), 2025, three seeds, priced on Elvia's published
-2026 tariff sheet: PILOT_README_LINE The money is in the grid tariff's
-power part, which the monthly **peak budget** (ADR-011) moves: the
-compressor is capped so the hour stays under a site-set kW budget and is
-released only for comfort, frost or a tank near the backup heater. Report,
+**On a building calibrated to its own meters** (`site-001-v3`: a 3 562 m²
+Oslo office, ground-source heat pump, monthly CV(RMSE) 12.2 % against the
+site's meters, in-sample, plant sized from the design heat load), 2025,
+three seeds, priced on Elvia's published 2026 tariff sheet:
+the governed caretaker with the peak budget saves **44 800 NOK a year (18.3 %, seeds 18.1 %..18.5 %) and 22 229 kWh (11.8 %)** against the as-found control, cuts the winter peak mean from 105 to 76 kW and the backup heater from 12 791 to 5 311 kWh, with 45 comfort degree-hours a year (P0 0). The lever is the monthly **peak budget** (ADR-011): under
+it the heat pump recovers the building on its own, the resistive backup
+stays off, the setback is only as deep as the learned reheat rate recovers
+before occupancy, and the compressor is capped where the compressor itself
+is the peak; comfort, frost and a tank near the backup release it. Report,
 seed ranges, lever waterfall, tariff sensitivity and the SHA-256 of every
 input: [`docs/results/2026-10-28/pilot-site-001/`](docs/results/2026-10-28/pilot-site-001/);
 the method and its limits: [`docs/strategies.md`](docs/strategies.md#results-on-a-calibrated-building-site_001-no1-2025-adr-011).

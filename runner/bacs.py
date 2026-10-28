@@ -227,6 +227,10 @@ def cross_check(bacs: dict[str, Any], p0_thermal_kwh: float, p0_electrical_kwh: 
                        "stated."}
 
 
+def _n(v: float) -> str:
+    return f"{v:,.0f}".replace(",", " ")
+
+
 def to_markdown(b: dict[str, Any], xc: dict[str, Any] | None = None) -> str:
     out = [f"# Building-automation function audit ({b['standard']})", "",
            f"> {b['transcription']}", ""]
@@ -247,11 +251,11 @@ def to_markdown(b: dict[str, Any], xc: dict[str, Any] | None = None) -> str:
         out.append(f"| {g} | {b['office_bac_factors']['thermal'][g]:.2f} | {b['office_bac_factors']['electrical'][g]:.2f} |")
     if xc:
         out += ["", f"## Cross-check, class {xc['from_class']} to {xc['to_class']}", "",
-                f"- As-found energy the factors govern: thermal {xc['p0_thermal_kwh']:,} kWh, electrical "
-                f"{xc['p0_electrical_kwh']:,} kWh (equipment excluded).",
-                f"- The factors say: {xc['factor_saving_kwh']:,} kWh a year (thermal {xc['factor_thermal_saving_kwh']:,}, "
-                f"electrical {xc['factor_electrical_saving_kwh']:,}).",
-                f"- The simulation says: {xc['simulated_saving_kwh']:,} kWh a year "
+                f"- As-found energy the factors govern: thermal {_n(xc['p0_thermal_kwh'])} kWh, electrical "
+                f"{_n(xc['p0_electrical_kwh'])} kWh (equipment excluded).",
+                f"- The factors say: {_n(xc['factor_saving_kwh'])} kWh a year (thermal {_n(xc['factor_thermal_saving_kwh'])}, "
+                f"electrical {_n(xc['factor_electrical_saving_kwh'])}).",
+                f"- The simulation says: {_n(xc['simulated_saving_kwh'])} kWh a year "
                 f"(ratio {xc['ratio_simulated_to_factor']}).", "", xc["reading"]]
     out += ["", "## EPBD context", "", f"{b['epbd']['directive']}:"]
     out += [f"- {r}" for r in b["epbd"]["requirements"]]

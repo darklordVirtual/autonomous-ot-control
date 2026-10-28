@@ -24,7 +24,7 @@ JS = r"""
 const D = window.__DEMO__;
 const fmt = (v, d=0) => (v==null? '–' : Number(v).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d}).replace(/,/g,' '));
 const pct = v => v==null? '–' : v.toFixed(1)+' %';
-const C = {P0:'#9aa5b1',P1:'#6b8fb3',P2:'#3f7fbf',P3:'#1f5fa8',P3pb:'#0b8a5a',budget:'#b9410f',measured:'#9aa5b1',simulated:'#1f5fa8'};
+const C = {P0:'var(--p0)',P1:'var(--p1)',P2:'var(--p2)',P3:'var(--p3)',P3pb:'var(--pb)',budget:'var(--warn)',measured:'var(--p0)',simulated:'var(--p3)'};
 const MN = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 
 function bars(el, series, labels, unit, hline){
@@ -32,8 +32,8 @@ function bars(el, series, labels, unit, hline){
   const vmax=Math.max(hline||0, ...keys.flatMap(k=>series[k]))||1;
   const pw=W-L-12, ph=H-T-B, gw=pw/labels.length, bw=gw/(keys.length+1);
   let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
-  for(let i=0;i<5;i++){const yv=vmax*i/4, yy=T+ph-ph*i/4; s+=`<line x1="${L}" y1="${yy}" x2="${W-12}" y2="${yy}" stroke="#dde3e8"/><text x="${L-6}" y="${yy+4}" text-anchor="end" fill="#5b6b7a">${fmt(yv)}</text>`;}
-  labels.forEach((lab,j)=>{const x0=L+j*gw; s+=`<text x="${x0+gw/2}" y="${H-12}" text-anchor="middle" fill="#5b6b7a">${lab}</text>`;
+  for(let i=0;i<5;i++){const yv=vmax*i/4, yy=T+ph-ph*i/4; s+=`<line x1="${L}" y1="${yy}" x2="${W-12}" y2="${yy}" stroke="var(--line)"/><text x="${L-6}" y="${yy+4}" text-anchor="end" fill="var(--mute)">${fmt(yv)}</text>`;}
+  labels.forEach((lab,j)=>{const x0=L+j*gw; s+=`<text x="${x0+gw/2}" y="${H-12}" text-anchor="middle" fill="var(--mute)">${lab}</text>`;
     keys.forEach((k,i)=>{const v=series[k][j], h=ph*v/vmax; s+=`<rect x="${x0+bw*(i+.5)}" y="${T+ph-h}" width="${bw*.9}" height="${h}" fill="${C[k]||'#888'}"><title>${k} ${lab}: ${fmt(v)} ${unit}</title></rect>`;});});
   if(hline){const yy=T+ph-ph*hline/vmax; s+=`<line x1="${L}" y1="${yy}" x2="${W-12}" y2="${yy}" stroke="${C.budget}" stroke-dasharray="6 4" stroke-width="2"/><text x="${W-14}" y="${yy-6}" text-anchor="end" fill="${C.budget}">budget ${fmt(hline)} kW</text>`;}
   s+='</svg>';
@@ -57,7 +57,7 @@ function renderSweep(){
     ].map(k=>`<div class="kpi"><b>${k[1]}</b><span>${k[0]} — ${k[2]}</span></div>`).join('');
     bars(document.getElementById('schart'), {P0:months.map(m=>p0.monthly_peak_kw[m]), P3:months.map(m=>p3.monthly_peak_kw[m]), P3pb:months.map(m=>r.monthly_peak_kw[m])}, labels, 'kW', r.budget_kw);
     document.getElementById('stable').innerHTML='<tr><th>Budget kW</th><th>Cost NOK</th><th>Saving</th><th>Winter peak kW</th><th>Max peak kW</th><th>kWh</th><th>Comfort dh</th><th>Backup kWh</th><th>Releases</th></tr>'+
-      [p0,p3,...rows].map(x=>`<tr${x===r?' style="background:#e8f5ee"':''}><td>${x.strategy==='P3pb'?fmt(x.budget_kw):x.strategy}</td><td>${fmt(x.total_nok)}</td><td>${pct(x.saving_pct)}</td><td>${fmt(x.peak_kw_winter_mean)}</td><td>${fmt(x.peak_kw_max)}</td><td>${fmt(x.kwh)}</td><td>${fmt(x.comfort_dh)}</td><td>${fmt(x.backup_kwh)}</td><td>${fmt(x.released)}</td></tr>`).join('');
+      [p0,p3,...rows].map(x=>`<tr${x===r?' style="background:var(--hl)"':''}><td>${x.strategy==='P3pb'?fmt(x.budget_kw):x.strategy}</td><td>${fmt(x.total_nok)}</td><td>${pct(x.saving_pct)}</td><td>${fmt(x.peak_kw_winter_mean)}</td><td>${fmt(x.peak_kw_max)}</td><td>${fmt(x.kwh)}</td><td>${fmt(x.comfort_dh)}</td><td>${fmt(x.backup_kwh)}</td><td>${fmt(x.released)}</td></tr>`).join('');
   }
   sl.oninput=draw; draw();
 }
@@ -72,16 +72,16 @@ function renderDay(){
     const vmax=Math.max(...rs.map(r=>r.power_kw), D.pack_budget||0)*1.1||1;
     const x=i=>L+pw*i/(n-1), y=v=>T+ph-ph*v/vmax;
     let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
-    for(let i=0;i<5;i++){const yv=vmax*i/4; s+=`<line x1="${L}" y1="${y(yv)}" x2="${W-12}" y2="${y(yv)}" stroke="#dde3e8"/><text x="${L-6}" y="${y(yv)+4}" text-anchor="end" fill="#5b6b7a">${fmt(yv)}</text>`;}
-    rs.forEach((r,i)=>{ if(r.occupied){s+=`<rect x="${x(i)}" y="${T}" width="${pw/(n-1)}" height="${ph}" fill="#fff3d6" opacity=".6"/>`;}});
-    for(let h=0;h<24;h+=3){const i=rs.findIndex(r=>r.hour===h); if(i>=0) s+=`<text x="${x(i)}" y="${H-14}" text-anchor="middle" fill="#5b6b7a">${String(h).padStart(2,'0')}:00</text>`;}
+    for(let i=0;i<5;i++){const yv=vmax*i/4; s+=`<line x1="${L}" y1="${y(yv)}" x2="${W-12}" y2="${y(yv)}" stroke="var(--line)"/><text x="${L-6}" y="${y(yv)+4}" text-anchor="end" fill="var(--mute)">${fmt(yv)}</text>`;}
+    rs.forEach((r,i)=>{ if(r.occupied){s+=`<rect x="${x(i)}" y="${T}" width="${pw/(n-1)}" height="${ph}" fill="var(--occ)" opacity=".6"/>`;}});
+    for(let h=0;h<24;h+=3){const i=rs.findIndex(r=>r.hour===h); if(i>=0) s+=`<text x="${x(i)}" y="${H-14}" text-anchor="middle" fill="var(--mute)">${String(h).padStart(2,'0')}:00</text>`;}
     if(D.pack_budget) s+=`<line x1="${L}" y1="${y(D.pack_budget)}" x2="${W-12}" y2="${y(D.pack_budget)}" stroke="${C.budget}" stroke-dasharray="6 4" stroke-width="2"/>`;
     s+=`<polyline fill="none" stroke="${C.P3pb}" stroke-width="2" points="${rs.map((r,i)=>x(i)+','+y(r.power_kw)).join(' ')}"/>`;
-    s+=`<polyline fill="none" stroke="#1f5fa8" stroke-width="1.5" stroke-dasharray="3 3" points="${rs.map((r,i)=>x(i)+','+y(r.cap*vmax*0.5)).join(' ')}"/>`;
-    rs.forEach((r,i)=>{const col=r.hp==='peak_budget_released'?C.budget:(r.route==='fallback'||r.route==='escalate')?'#b9410f':(r.hp||'').startsWith('peak_budget')?C.P3pb:'#9aa5b1';
+    s+=`<polyline fill="none" stroke="var(--p3)" stroke-width="1.5" stroke-dasharray="3 3" points="${rs.map((r,i)=>x(i)+','+y(r.cap*vmax*0.5)).join(' ')}"/>`;
+    rs.forEach((r,i)=>{const col=r.hp==='peak_budget_released'?C.budget:(r.route==='fallback'||r.route==='escalate')?'var(--warn)':(r.hp||'').startsWith('peak_budget')?C.P3pb:'var(--p0)';
       s+=`<circle cx="${x(i)}" cy="${y(r.power_kw)}" r="3.5" fill="${col}"><title>${r.utc.slice(11,16)} ${fmt(r.power_kw)} kW · ${r.profile} ${r.overlays.join('+')} · HP ${r.hp} cap ${r.cap} · tank ${r.tank_c}→${r.tank_sp} · route ${r.route}</title></circle>`;});
     s+='</svg>';
-    document.getElementById('dchart').innerHTML=s+`<div class="legend"><span><i style="background:${C.P3pb}"></i>building power, hourly-mean basis (kW)</span><span><i style="background:#1f5fa8"></i>compressor cap (dashed, ×½ scale)</span><span><i style="background:${C.budget}"></i>budget / release</span><span><i style="background:#fff3d6"></i>occupied</span></div>`;
+    document.getElementById('dchart').innerHTML=s+`<div class="legend"><span><i style="background:${C.P3pb}"></i>building power, hourly-mean basis (kW)</span><span><i style="background:var(--p3)"></i>compressor cap (dashed, ×½ scale)</span><span><i style="background:${C.budget}"></i>budget / release</span><span><i style="background:var(--occ)"></i>occupied</span></div>`;
     document.getElementById('dtable').innerHTML='<tr><th>UTC</th><th>Profile</th><th>Overlays</th><th>Out °C</th><th>Price</th><th>Power kW</th><th>Cap</th><th>Tank °C → SP</th><th>Heat pump</th><th>Validation</th><th>Route</th><th>Changes</th></tr>'+
       rs.map(r=>`<tr><td>${r.utc.slice(11,16)}</td><td>${r.profile}</td><td>${r.overlays.join(', ')||'–'}</td><td>${fmt(r.outdoor_c,1)}</td><td>${fmt(r.price,2)}</td><td>${fmt(r.power_kw)}</td><td>${r.cap}</td><td>${fmt(r.tank_c,1)} → ${fmt(r.tank_sp,1)}</td><td>${r.hp}</td><td>${r.violations.length?r.violations.join(', '):'ok'}</td><td>${r.route}</td><td>${r.changes.join('; ')||'–'}</td></tr>`).join('');
   }
@@ -149,7 +149,7 @@ input[type=range]{{width:100%}}.row{{display:flex;gap:16px;align-items:center;ma
 <div class='kpi'><b>{_n(r['comfort_dh'])} dh</b><span>comfort degree-hours occupied (P0 {_n(y[base]['comfort_dh'])}); backup {_n(r['backup_heater'])} kWh; CO₂ excess {_n(r['co2_excess_ppmh'])} ppm·h</span></div>
 </div>
 <section id='sweep'><h2>Choose the budget</h2>
-<p>The grid tariff's power part is charged on the month's highest hourly mean. Move the budget: the caretaker caps the compressor so the hour stays under it and releases the cap only for comfort, frost or a tank near the backup heater. A budget that is too tight is released on the coldest mornings, and those hours set the peak.</p>
+<p>The grid tariff's power part is charged on the month's highest hourly mean. Under a budget the caretaker caps the compressor where the compressor is the peak, keeps the resistive backup heater off for recoveries the compressor can make on its own, and sets back only as far as the learned reheat rate recovers before occupancy. Comfort, frost and a tank near the backup release it; on the coldest mornings that release sets the month's peak. Move the budget to see what changes, and what does not.</p>
 <div class='row'><input id='budget' type='range' step='1'><b id='bval' style='min-width:90px'></b></div>
 <div class='kpis' id='skpi'></div><div id='schart'></div><table id='stable'></table>
 </section>
