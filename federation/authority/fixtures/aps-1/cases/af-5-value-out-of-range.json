@@ -1,0 +1,121 @@
+{
+  "call": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "decision_time": "2026-01-15T07:00:00Z",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-normalized-call/v1",
+    "unit": "degC",
+    "value": 22.5
+  },
+  "case_id": "af-5-value-out-of-range",
+  "construction": "valid chain granting ZONE-01; the value 22.5 is outside the work order's 19.0..21.0, which the delegation does not carry",
+  "delegation": [
+    {
+      "authority": {
+        "depth": {
+          "remaining": 1
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint",
+            "ot:demo-building-001:ZONE-02:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T23:59:59.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:building-owner",
+      "nonce": "4683832339816af75723b7ce780fdabe",
+      "parent_delegation_id": null,
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "42a429463f8ac762eb8f00792e7f3de15abe5adfa0f404e755e89fa2a7e3e136853b5bf120a3ecc32e0e58f581627f9a755ed00b3ae9cfb31467f146e51e6909",
+      "subject": "aps-test:operator",
+      "verification_method": "aps-test:building-owner#key-1",
+      "version": "1.0"
+    },
+    {
+      "authority": {
+        "depth": {
+          "remaining": 0
+        },
+        "reputation": {
+          "ceiling": 100,
+          "profile": "aps-score-0-100-v1"
+        },
+        "reversibility": {
+          "ceiling": "compensable",
+          "profile": "aps-tci-v1"
+        },
+        "scope": {
+          "grants": [
+            "ot:demo-building-001:ZONE-01:setpoint_c:set_zone_setpoint"
+          ],
+          "profile": "aps-hierarchical-v1"
+        },
+        "spend": {
+          "mode": "unbounded"
+        },
+        "time": {
+          "not_after": "2026-01-15T18:00:00.000Z",
+          "not_before": "2026-01-15T00:00:00.000Z"
+        },
+        "values": {
+          "profile": "aps-values-identifiers-v1",
+          "required": []
+        }
+      },
+      "delegation_id": "sha256:4208956f10743a127a3ebd2387839132077e08c04a4ae457c8ab4a4c48adf6e8",
+      "issued_at": "2026-01-15T00:00:00.000Z",
+      "issuer": "aps-test:operator",
+      "nonce": "71b36309a1f8c276ba545c356ce9a7ba",
+      "parent_delegation_id": "sha256:f43dde8e67b14e50635081677fff04e08412402611aa1fab287ddeccbfac9b4d",
+      "record_type": "aps:authority-delegation:v1",
+      "signature": "314730d4d058e6aab9b1be0bb9ce90490d9ef58ac5c248a93641ed1e7ee91733009863a172540ea7831df28499a315c7973edf2b78e0dcef565463f3c6e1c30d",
+      "subject": "aps-test:agent",
+      "verification_method": "aps-test:operator#key-1",
+      "version": "1.0"
+    }
+  ],
+  "schema": "ot-authority-case/v1",
+  "work_order": {
+    "asset": "ZONE-01",
+    "building_id": "demo-building-001",
+    "delegation_id": "sha256:4208956f10743a127a3ebd2387839132077e08c04a4ae457c8ab4a4c48adf6e8",
+    "delegation_sha256": "b1be1d9eefcbf1e251a97869d5d584b54e41b1acebf9758322a6f5c03b9c109b",
+    "issuer": "testbed-test-key-1",
+    "operation": "set_zone_setpoint",
+    "parameter": "setpoint_c",
+    "schema": "ot-work-order/v1",
+    "signature": "STlO1xbkbnVUPfsAzYqOpT0W9TT1vGbAlQHWZtpS0ruHuNiBOda_Uz-O6OzM60kAhFmmIBR3oZl6aq4NcnthCg",
+    "valid_from": "2026-01-15T00:00:00Z",
+    "valid_until": "2026-01-15T23:59:59Z",
+    "value_range": {
+      "max": 21.0,
+      "min": 19.0,
+      "unit": "degC"
+    },
+    "work_order_id": "WO-af-5-value-out-of-range"
+  }
+}
