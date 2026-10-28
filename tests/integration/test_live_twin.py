@@ -89,7 +89,7 @@ def live(tmp_path):
                 p.wait(5)
         procs.remove(p)
         output = log_path.read_text(errors="replace")[-4000:]
-        raise RuntimeError(f"twin did not start (exit={exit_code}, ports={ports}):\\n{output}")
+        raise RuntimeError(f"twin did not start (exit={exit_code}, ports={ports}):\n{output}")
 
     def stop() -> None:
         while procs:
