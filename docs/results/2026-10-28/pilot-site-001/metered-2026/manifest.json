@@ -1,0 +1,116 @@
+{
+  "schema": "ot-pilot-evidence/v1/manifest",
+  "created_utc": "2026-10-28T06:25:09.915661Z",
+  "testbed": {
+    "commit": "77b9fe82061141220c21deac557244b5c0a766e3",
+    "dirty": true
+  },
+  "python": "3.13.18",
+  "argv": [
+    "--config",
+    "twin/fixtures/calibrated/site-001-v3.json",
+    "--area",
+    "NO1",
+    "--scenario",
+    "scenarios/no1-2026-metered-period-hvac-v1.json",
+    "--seeds",
+    "177",
+    "--strategies",
+    "P0",
+    "P1",
+    "P3",
+    "P3pb",
+    "--peak-budget-kw",
+    "60",
+    "--monthly-check",
+    "docs/results/2026-10-28/pilot-site-001/monthly-check-v3.json",
+    "--workers",
+    "2",
+    "--out",
+    "/tmp/claude-0/-home-claude/307815a1-36f2-58ee-a5dc-ff066381ef80/scratchpad/t1/pilot-metered"
+  ],
+  "area": "NO1",
+  "seeds": [
+    177
+  ],
+  "strategies": [
+    "P0",
+    "P1",
+    "P3",
+    "P3pb"
+  ],
+  "tariffs": [
+    "elvia-stor-naering-lavspent-2026-07",
+    "elvia-stor-naering-lavspent-2026-01",
+    "reference-generic"
+  ],
+  "policy_overrides": {
+    "peak_budget": {
+      "kw": 60.0
+    }
+  },
+  "inputs": {
+    "fixture": {
+      "path": "twin/fixtures/calibrated/site-001-v3.json",
+      "sha256": "941b522dcc657c0a89dee4ab854367fa18ace85fad37a1ec1684f3d4dc3a51a2",
+      "building_id": "site-001-v3"
+    },
+    "scenario": {
+      "path": "scenarios/no1-2026-metered-period-hvac-v1.json",
+      "sha256": "d533651b0724ce406685c9ba02cd3de011966ef1d988f30410dd119efcf17370",
+      "scenario_id": "no1-2026-metered-period-hvac-v1"
+    },
+    "series": {
+      "outdoor": {
+        "path": "scenarios/data/demo-building-no1/outdoor-temperature-2026-02-16_2026-10-26.json",
+        "sha256": "abfb54bfc03b620695020cb70e433125e9a8b2f038481438f88f6f764960828a",
+        "declared_sha256": "abfb54bfc03b620695020cb70e433125e9a8b2f038481438f88f6f764960828a",
+        "verified": true
+      },
+      "price": {
+        "path": "scenarios/data/demo-building-no1/price-NO1-2026-02-16_2026-10-26.json",
+        "sha256": "4dc961c017088f591829259c232ce1b86c73b01779f40d20e22f85e5268d5e8e",
+        "declared_sha256": "4dc961c017088f591829259c232ce1b86c73b01779f40d20e22f85e5268d5e8e",
+        "verified": true
+      },
+      "solar": {
+        "path": "scenarios/data/demo-building-no1/solar-shortwave-2026-02-16_2026-10-26.json",
+        "sha256": "458274fad6a689a8a0047999ad7f159ffd1225f00e482f2a56579f87e30c1935",
+        "declared_sha256": "458274fad6a689a8a0047999ad7f159ffd1225f00e482f2a56579f87e30c1935",
+        "verified": true
+      },
+      "humidity": {
+        "path": "scenarios/data/demo-building-no1/humidity-rh-2026-02-16_2026-10-26.json",
+        "sha256": "a6303a9e412f96a93920187683527187569e12beff2faa6ab88c04fd0d239ecc",
+        "declared_sha256": "a6303a9e412f96a93920187683527187569e12beff2faa6ab88c04fd0d239ecc",
+        "verified": true
+      },
+      "precipitation": {
+        "path": "scenarios/data/demo-building-no1/precipitation-precip-2026-02-16_2026-10-26.json",
+        "sha256": "68d958585b5ad0455ed2d199ee9e8bb40bd197e4e3fe5e96d923a15c90eb84a7",
+        "declared_sha256": "68d958585b5ad0455ed2d199ee9e8bb40bd197e4e3fe5e96d923a15c90eb84a7",
+        "verified": true
+      }
+    },
+    "policy": {
+      "site_policy": {
+        "path": "deploy/ot/site_policy.v1.json",
+        "sha256": "82f85aa4b5a44401e78d6d685b6e88e1b38386f2e26e01dcc93e4fab2d8f051a"
+      },
+      "fallback": {
+        "path": "deploy/ot/caretaker_fallback.v1.json",
+        "sha256": "c5b95e15f48b2a6f542e33ab9cc66a497ed5eb4875a1117c9b8c0f8660732156"
+      }
+    },
+    "calibration": {
+      "site_id": "SITE_001",
+      "path": "scenarios/calibration/site-001.json",
+      "sha256": "74075901e0e67d97cd10b1a7229a38a9c0036c8e7594aa38af05a5aaea60260b",
+      "source_sha256": "006c212546b0496b30d8c840ce88219a02ab9d7e1ea684ce9dccbc670b319fec"
+    },
+    "monthly_check": {
+      "path": "docs/results/2026-10-28/pilot-site-001/monthly-check-v3.json",
+      "sha256": "afbf3f72c88f697744620657a1e98307d745dae9be9839d64b4ee5b6c01c6f24"
+    }
+  }
+}

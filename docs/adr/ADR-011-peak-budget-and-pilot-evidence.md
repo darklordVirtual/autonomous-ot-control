@@ -152,6 +152,10 @@ it:
   cold months (January, February) unchanged at about 104 kW because the
   compressor cannot carry them and the comfort guard restores the backup.
   Comfort degree-hours 44 a year for P3 and P3pb against 0 for P0 and P1.
+- The pack (three seeds): P3pb saves 44 800 NOK (18.3 %, seeds
+  18.1..18.5 %) and 22 229 kWh (11.8 %) a year; on the site's own metered
+  period of 2026 (one seed) 35 025 NOK (17.8 %) and 14 683 kWh (12.5 %).
+  The sweep over 40..100 kW is flat (18.4..18.6 %).
 - On this plant the compressor cap almost never binds (3 steps a year):
   the budget's value is the heat-pump-only recovery and the recoverable
   setback, and the pack's sweep shows the number is insensitive to the

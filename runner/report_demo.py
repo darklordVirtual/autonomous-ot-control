@@ -90,9 +90,12 @@ function renderDay(){
 
 function renderCalibration(){
   const c=D.calibration; if(!c||!c.validation){document.getElementById('cal').style.display='none';return;}
-  const v=c.validation.total, bm=v.by_month_kwh||{}; const months=Object.keys(bm).sort();
-  bars(document.getElementById('cchart'), {measured:months.map(m=>bm[m][0]), simulated:months.map(m=>bm[m][1])}, months.map(m=>MN[+m.slice(5,7)-1]+' '+m.slice(2,4)), 'kWh');
-  document.getElementById('ctext').innerHTML=`Site <b>${c.site_id}</b>: monthly CV(RMSE) <b>${v.monthly_cv_rmse_pct} %</b>, NMBE <b>${v.monthly_nmbe_pct} %</b> over ${v.months} months (Guideline 14 monthly ${v.guideline14_monthly?'<b class="ok">met</b>':'<b class="bad">not met</b>'}); hourly CV(RMSE) ${v.cv_rmse_pct} % (${v.guideline14_hourly?'met':'not met'}). Measured ${fmt(v.measured_kwh)} kWh, simulated ${fmt(v.simulated_kwh)} kWh on the hours both have. In-sample.`;
+  const v=c.validation.total, mc=c.monthly_check&&c.monthly_check.groups&&c.monthly_check.groups.total;
+  const bm=mc?mc.by_month:(v.by_month_kwh||{}); const months=Object.keys(bm).sort();
+  const meas=months.map(m=>mc?bm[m].measured:bm[m][0]), sim=months.map(m=>mc?bm[m].new_gated:bm[m][1]);
+  bars(document.getElementById('cchart'), {measured:meas, simulated:sim}, months.map(m=>MN[+m.slice(5,7)-1]+' '+m.slice(2,4)), 'kWh');
+  const st=mc||v;
+  document.getElementById('ctext').innerHTML=`Site <b>${c.site_id}</b>${mc?' (this fixture, plant sized from the design heat load; the fitted fixture gave CV(RMSE) '+v.monthly_cv_rmse_pct+' %, NMBE '+v.monthly_nmbe_pct+' %)':''}: monthly CV(RMSE) <b>${st.monthly_cv_rmse_pct} %</b>, NMBE <b>${st.monthly_nmbe_pct} %</b> over ${st.months} months (Guideline 14 monthly ${st.guideline14_monthly?'<b class="ok">met</b>':'<b class="bad">not met</b>'}); hourly CV(RMSE) ${v.cv_rmse_pct} % (${v.guideline14_hourly?'met':'not met'}). Measured ${fmt(v.measured_kwh)} kWh on the hours both have. In-sample.`;
 }
 renderSweep(); renderDay(); renderCalibration();
 """

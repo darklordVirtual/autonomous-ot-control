@@ -79,6 +79,12 @@ tariff sensitivity and the evidence digests:
 | P3 caretaker | 217 316 | 27 617 (27 173..28 062) | 11.3 % | 174 377 | 13 465 (7.2 %) | 90 | 15 685 | 44 |
 | **P3pb caretaker + peak budget** | 200 133 | 44 800 (44 238..45 216) | 18.3 % | 165 613 | 22 229 (11.8 %) | 76 | 5 311 | 45 |
 
+On the site's own metered period (2026-02-16..2026-10-26, the scenario the
+calibration was fitted on; one seed; [`metered-2026/`](results/2026-10-28/pilot-site-001/metered-2026/)):
+P0 197 013 NOK, 117 815 kWh; P3pb saves 35 025 NOK (17.8 %) and 14 683 kWh
+(12.5 %), the backup heater 4 042 → 1 297 kWh, the winter-month peak mean
+104 → 63 kW, 39 comfort degree-hours.
+
 **Read it with care.** On this building, as sized from its certificate
 (a 58 kW ground-source heat pump with a 48 kW direct-electric backup,
 `docs/calibration.md`), the month's highest hourly mean is set by the
