@@ -1,6 +1,6 @@
 {
   "schema": "remora-cumulative-limits/v1",
-  "comment": "Accelerated-simulation variant, for runner.demo ONLY. REMORA measures limit windows on its own wall clock, while the demo compresses a simulated day into minutes; the production budgets (ot_limits.policy.json) would then refuse a normal day's changes as if they happened within one real hour (found 2026-10-27). Here the zone-01/02 window is 60 s with the same 4.0 degC budget, which bounds movement per simulated controller step at the demo's pace. Cumulative-limit behaviour itself is demonstrated in real time by the acceptance case LIM-01 with the production policy, never by this file.",
+  "comment": "Accelerated-simulation variant, for runner.demo ONLY. REMORA measures limit windows on its own wall clock, while the demo compresses a simulated day into minutes; the production budgets (ot_limits.policy.json) would then refuse a normal day's changes as if they happened within one real hour (found 2026-10-27). Here every zone's window is 60 s with the same budgets (4.0 degC for zone-01/02, 0.5 degC for zone-03; zone-03 was left at 3600 s until 2026-10-28, which held it for simulated days after one legitimate step), which bounds movement per simulated controller step at the demo's pace. Cumulative-limit behaviour itself is demonstrated in real time by the acceptance case LIM-01 with the production policy, never by this file.",
   "coverage": "all_writes",
   "meters": {
     "set_zone_setpoint": [
@@ -131,7 +131,7 @@
       "resource": "ZONE-03",
       "principal": "*",
       "max": 5,
-      "window_seconds": 3600
+      "window_seconds": 60
     },
     {
       "limit_id": "zone-cooling-movement",

@@ -237,7 +237,7 @@ def edge_context(day: str, zone: str, current: float, intent_ref: str | None, t_
     seconds). Nothing of REMORA's decision and no credential."""
     plan = ({**{z: sorted(PLAN_VALUES) for z in SETBACK_ZONES}, "ZONE-03": [OCCUPIED_C]}
             if intent_ref == f"PLAN-{day}" else {})
-    if ATTACK_SET == attacks_mod.ALL_RULES and intent_ref == attacks_mod.lab_ref(day):
+    if attacks_mod.includes_all_rules(ATTACK_SET) and intent_ref == attacks_mod.lab_ref(day):
         plan = attacks_mod.lab_work_order(day)["zones"]
     cx = {"intent_ref": intent_ref, "work_order": {"zones": plan}, "current_setpoint_c": current,
           "max_delta_c": MAX_STEP_C, "sim_time_s": t_s}
