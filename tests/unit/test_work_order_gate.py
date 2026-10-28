@@ -172,3 +172,15 @@ def test_the_shipped_work_orders_state_what_they_permit():
     assert "permits" not in shipped["MON-ROUND"]  # a read-only round permits no write
     compose = (ROOT / "compose.governed.yaml").read_text("utf-8")
     assert "REMORA_OT_WORK_ORDER_GATE: enforce" in compose
+
+
+def test_a_work_order_remora_resolved_none_for_reaches_the_edge_as_unresolved():
+    spec = importlib.util.spec_from_file_location("edge_srv2", ROOT / "federation" / "edges" / "_inline_template" / "server.py")
+    edge = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(edge)
+    call = {"tool_name": "set_zone_setpoint", "intent_ref": "PLAN-2026-01-17", "arguments": {"zone_id": "ZONE-01", "setpoint_c": 20.0}}
+    assert edge.decide({"call": call, "context": {"work_order": {"zones": {}}, "work_order_problem": "unresolved"}}) == \
+        {"verdict": "refuse", "reason": "work_order_unresolved"}
+    src = (OT / "ot_reviewer.py").read_text("utf-8")
+    assert 'cx["work_order_problem"] = {"zones": {}}, "unresolved"' in src.replace('cx["work_order"], ', '')
+    assert 'edge_id="reviewer-binding"' in src
