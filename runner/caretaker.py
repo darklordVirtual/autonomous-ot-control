@@ -106,6 +106,70 @@ class Proposal:
     algorithms: dict[str, str] = field(default_factory=dict)
 
 
+class PeakBudget:
+    """Forward-looking cap on the heat pump so the building's hourly mean power
+    stays under a monthly budget (the grid tariff's power part is charged on
+    the month's highest hourly mean kW; ADR-011).
+
+    The budget is a site value (`site_policy.peak_budget.kw_by_month`, or one
+    `kw` for every month). The cap is derived from what the plant reports,
+    never from its configuration: the heat pump's full-output electrical draw
+    is learned as an exponential mean of `HP-01.ElectricPower / HP-01.MaxFraction`
+    while it runs (prior: `hp_full_kw_prior`), and the rest of the building's
+    power is read from the energy meter minus the heat pump. The cap is
+
+        cap = clamp((budget_kw - other_kw) / hp_full_kw, min_fraction, 1)
+
+    so that even at 100 % duty the hour stays under budget. Three guards release
+    the cap, comfort and safety before the tariff: frost protection, an occupied
+    zone below the comfort floor plus `comfort_margin_k`, and a tank within
+    `tank_release_k` of the backup heater's threshold (setpoint - 5 K, COP 1).
+    A cap is set or tightened only while the tank holds (IL-09); with a short
+    tank the caretaker first brings the tank setpoint down to the tank so that
+    the write is valid, and while a cap binds the setpoint follows the tank so
+    that the caretaker never asks for heat the budget forbids (the lower supply
+    temperature is the throttle). The cheap-hour tank charge is skipped.
+    """
+
+    def __init__(self, cfg: dict[str, Any]) -> None:
+        self.enabled = bool(cfg.get("enabled", False))
+        self.kw_by_month: dict[str, float] = {str(k): float(v) for k, v in (cfg.get("kw_by_month") or {}).items()}
+        self.kw_default = cfg.get("kw")
+        self.min_fraction = float(cfg.get("min_fraction", 0.3))
+        self.comfort_margin_k = float(cfg.get("comfort_margin_k", 0.3))
+        self.tank_release_k = float(cfg.get("tank_release_k", 1.0))
+        self.hp_full_kw = float(cfg.get("hp_full_kw_prior", 0.0)) or None
+        self.alpha = float(cfg.get("learning_rate", 0.05))
+        self.observations = 0
+
+    def budget_kw(self, month: str) -> float | None:
+        """`month` is `YYYY-MM`; a budget keyed by month number (`"01"`) or by `YYYY-MM`."""
+        if not self.enabled:
+            return None
+        v = self.kw_by_month.get(month, self.kw_by_month.get(month[5:7]))
+        if v is None and self.kw_default is not None:
+            v = float(self.kw_default)
+        return v
+
+    def observe(self, points: dict[str, float], fraction: float) -> None:
+        if not self.enabled or points.get("HP-01.Running", 0.0) < 0.5 or fraction <= 0:
+            return
+        full_kw = points.get("HP-01.ElectricPower", 0.0) / 1000 / fraction
+        if full_kw <= 0:
+            return
+        self.hp_full_kw = full_kw if self.hp_full_kw is None else (1 - self.alpha) * self.hp_full_kw + self.alpha * full_kw
+        self.observations += 1
+
+    def cap(self, month: str, other_kw: float) -> tuple[float, dict[str, float]] | None:
+        budget = self.budget_kw(month)
+        if budget is None or not self.hp_full_kw:
+            return None
+        raw = (budget - other_kw) / self.hp_full_kw
+        cap = max(self.min_fraction, min(1.0, raw))
+        return round(cap, 2), {"budget_kw": budget, "other_kw": round(other_kw, 2),
+                               "hp_full_kw": round(self.hp_full_kw, 2), "raw": round(raw, 3)}
+
+
 @dataclass
 class Stats:
     profiles: dict[str, int] = field(default_factory=lambda: dict.fromkeys(PROFILES, 0))
@@ -130,12 +194,24 @@ class Caretaker:
 
     def __init__(self, tw: Twin, *, validated: bool = True, record_days: set[str] | None = None,
                  adaptive_deadband: bool = False, proposal_fault_rate: float = 0.0, seed: int = 0,
-                 dispatcher: Callable[[str, dict[str, Any]], bool] | None = None) -> None:
+                 dispatcher: Callable[[str, dict[str, Any]], bool] | None = None,
+                 policy_overrides: dict[str, Any] | None = None) -> None:
         self.tw, self.validated, self.adaptive_deadband = tw, validated, adaptive_deadband
         self.dispatcher = dispatcher
         self.proposal_fault_rate = proposal_fault_rate
         self._fault_rng = random.Random(f"{seed}:optimizer-faults")
         self.policy = load_policy()
+        # Site-specific values a run may set on top of the policy file (a pilot's
+        # peak budget, say). They are part of the decision record's provenance.
+        self.policy_overrides = dict(policy_overrides or {})
+        for k, v in self.policy_overrides.items():
+            if isinstance(v, dict) and isinstance(self.policy.get(k), dict):
+                self.policy[k] = {**self.policy[k], **v}
+            else:
+                self.policy[k] = v
+        self.policy_overrides_sha = hashlib.sha256(
+            json.dumps(self.policy_overrides, sort_keys=True).encode()).hexdigest() if self.policy_overrides else None
+        self.peak_budget = PeakBudget(self.policy.get("peak_budget") or {})
         self.fallback = json.loads(FALLBACK_PATH.read_text("utf-8"))
         self.fallback_sha = _sha(FALLBACK_PATH)
         self.policy_sha = _sha(POLICY_PATH)
@@ -148,6 +224,8 @@ class Caretaker:
         self._fault: dict[str, dict[str, Any]] = {}
         self._sat = float(tw.setpoints.supply_air_c)
         self._purging = False
+        self._budget_ctx: dict[str, Any] | None = None
+        self._chiller_eer: float | None = None
         self._day_prices: dict[int, list[float]] = {}
         self._detected: set[tuple[str, str, int]] = set()
         self.alarms: list[dict[str, Any]] = []
@@ -269,6 +347,7 @@ class Caretaker:
         peak_kw = getattr(tw, "monthly_peak_kw", {}).get(month, 0.0)
         power_kw = tw.power_w / 1000
         tank = tw.plant_state.tank_c
+        self.peak_budget.observe(pts, tw.setpoints.hp_max_fraction)
 
         # -- overlays (constraints on top of any profile) --
         overlays = []
@@ -352,7 +431,10 @@ class Caretaker:
                    "t_s": t, "utc": tw.clock.utc_at(t).isoformat().replace("+00:00", "Z"),
                    "context": ctx,
                    "context_sha256": hashlib.sha256(json.dumps(ctx, sort_keys=True).encode()).hexdigest(),
-                   "site_policy_sha256": self.policy_sha, "overlays": overlays, "base_profile": profile,
+                   "site_policy_sha256": self.policy_sha,
+                   "policy_overrides_sha256": self.policy_overrides_sha,
+                   "peak_budget": getattr(self, "_budget_ctx", None),
+                   "overlays": overlays, "base_profile": profile,
                    "algorithms": prop.algorithms if prop else {}, "proposal": _plain(prop) if prop else None,
                    "validation": {"ok": not violations, "violations": violations},
                    "fallback": {"used": used_fallback, "sha256": self.fallback_sha} if used_fallback else None,
@@ -366,6 +448,7 @@ class Caretaker:
                  top: list[int], hour: int, heating_season: bool, tank: float, near_peak: bool,
                  high_price: bool) -> Proposal:
         tw, sc, pol = self.tw, self.tw.scenario, self.policy
+        pts = tw.points
         algos: dict[str, str] = {}
         heating: dict[str, float] = {}
         frost = "frost_protection" in overlays
@@ -423,10 +506,20 @@ class Caretaker:
         temps = [tel[z]["temp_c"] for z in ZONES if not tel[z]["suspect"]] or [tw.zones[z].temp_c for z in ZONES]
         zmean = sum(temps) / len(temps)
         night = hour >= 20 or hour < 4
+        # A purge only pays where it displaces mechanical cooling that costs
+        # something: the fans run at SFP while the cooling they avoid may come
+        # at an EER of 30+ from energy wells (SITE_001). The chiller's observed
+        # EER is learned from CH-01.EER while cooling runs; above
+        # purge_max_chiller_eer the purge is skipped (ADR-011).
+        eer = pts.get("CH-01.EER", 0.0)
+        if pts.get("CH-01.CoolingLoad", 0.0) > 0 and eer > 0:
+            self._chiller_eer = eer if self._chiller_eer is None else 0.95 * self._chiller_eer + 0.05 * eer
+        purge_pays = self._chiller_eer is None or self._chiller_eer <= pol.get("purge_max_chiller_eer", 8.0)
         if self._purging:
-            self._purging = (not heating_season and not occupied and night and zmean > 21.0 and out_c < zmean - 2.0)
+            self._purging = (purge_pays and not heating_season and not occupied and night and zmean > 21.0
+                             and out_c < zmean - 2.0)
         else:
-            self._purging = (not heating_season and not occupied and night and zmean > 22.5
+            self._purging = (purge_pays and not heating_season and not occupied and night and zmean > 22.5
                              and 10.0 <= out_c < zmean - 3.0)
 
         # Supply air: Trim & Respond outside the heating season, a fixed reset in it.
@@ -451,9 +544,15 @@ class Caretaker:
         algos["ahu"] = "occupancy_schedule" + ("+purge" if self._purging else "")
 
         # Tank: weather reset, charged in the day's cheapest hours, held before a price block.
-        need = weather_compensated_supply_c(out_c) + 5.0
+        # Under a peak budget the cheap-hour charge is skipped: a +5 K charge of the
+        # buffer is one hour of high compressor power, exactly what the budget pays for
+        # (ADR-011; the price shift was already a negative result on its own).
+        month = tw.clock.utc_at(t).strftime("%Y-%m")
+        budget_active = self.peak_budget.enabled and self.peak_budget.budget_kw(month) is not None
+        curve_c = weather_compensated_supply_c(out_c)
+        need = curve_c + 5.0
         base = min(55.0, max(45.0, need))
-        if hour in cheap and heating_season:
+        if hour in cheap and heating_season and not budget_active:
             tgt_tank, algos["tank"] = min(pol["tank_max_c"], base + 5.0), "price_ranked_charge"
         else:
             tgt_tank, algos["tank"] = base, "weather_reset"
@@ -466,6 +565,46 @@ class Caretaker:
         if not frost and not recovering and (near_peak or (profile == "demand_response" and high_price)) \
                 and tank >= tank_sp - 2.0:
             cap, algos["heat_pump"] = 0.6, "peak_limiter"
+        # Peak budget (ADR-011): forward-looking, independent of the reactive limiter above.
+        self._budget_ctx = None
+        if budget_active:
+            other_kw = max(0.0, (tw.power_w - pts.get("HP-01.ElectricPower", 0.0)) / 1000)
+            comfort_short = occupied and any(
+                not tel[z]["suspect"] and tel[z]["temp_c"] < pol["occupied_heating_min_c"] + self.peak_budget.comfort_margin_k
+                for z in ZONES)
+            # The tank is short when the backup heater (COP 1, at setpoint - 5 K) is near.
+            # A slower recovery under the cap is the budget's price; the self-tuning
+            # optimal start sees the slower reheat and starts earlier.
+            tank_short = tank < cur - 5.0 + self.peak_budget.tank_release_k
+            budget = self.peak_budget.cap(month, other_kw)
+            if frost or comfort_short or tank_short:
+                cap, algos["heat_pump"] = 1.0, "peak_budget_released"
+                self._budget_ctx = {"released": "frost" if frost else "comfort" if comfort_short else "tank"}
+            elif budget is not None:
+                cap_b, ctx = budget
+                if tank >= round(tank_sp, 2) - 2.0:           # IL-09: a cap only while the tank holds
+                    if cap_b < cap:
+                        cap, algos["heat_pump"] = cap_b, "peak_budget"
+                elif cap_b < min(cap, tw.setpoints.hp_max_fraction) and tank >= cur - pol["tank_max_step_k"] - 1.99:
+                    # A short tank and a cap to set or tighten (after a release, at the
+                    # start, or when the rest of the building's load rose): bring the
+                    # setpoint down to the tank so the cap is valid now (IL-09 reads the
+                    # proposal's setpoint), instead of running above budget for the steps
+                    # it would take the buffer to climb back within 2 K of the old setpoint.
+                    tank_sp = round(max(pol["tank_min_c"], cur - pol["tank_max_step_k"], tank + 1.99), 2)
+                    cap, algos["heat_pump"] = cap_b, "peak_budget"
+                elif tw.setpoints.hp_max_fraction < 1.0:      # hold what is set
+                    cap, algos["heat_pump"] = tw.setpoints.hp_max_fraction, "peak_budget_hold"
+                if cap < 1.0:
+                    # Ask the buffer for no more than the capped compressor can hold: the
+                    # setpoint follows the tank (+3 K, the charging hysteresis), within
+                    # IL-04's step, so neither the backup heater nor IL-09 fires because
+                    # the caretaker itself asked for heat the budget forbids. The lower
+                    # supply temperature is the throttle (supply = min(curve, tank)).
+                    follow = round(max(pol["tank_min_c"], min(tank_sp, tank + 3.0)), 2)
+                    tank_sp = round(max(cur - pol["tank_max_step_k"], follow), 2)
+                    algos["tank"] = algos["tank"] + "+budget_follow" if tank_sp < base else algos["tank"]
+                self._budget_ctx = ctx
         algos["lighting"] = "presence_daylight"
         algos["cables"] = "ground_sensor"
         return Proposal(heating=heating, cooling=cooling, supply_air_c=round(sat, 2), tank_c=round(tank_sp, 2),
@@ -536,7 +675,12 @@ class Caretaker:
             v.append("OVL-iaq")
         if occupied and p.lighting_mode not in ("presence", "schedule"):
             v.append("IL-08")
-        if p.hp_max_fraction < 1.0 and tw.plant_state.tank_c < p.tank_c - 2.0:
+        # IL-09 governs the write: a cap may not be set or tightened while the tank is
+        # short (the twin's guard refuses exactly that). A cap already in force is
+        # held, not re-written; the peak budget releases it at tank_release_k, before
+        # the backup heater would start (ADR-011).
+        if (p.hp_max_fraction < 1.0 and p.hp_max_fraction < tw.setpoints.hp_max_fraction - 1e-9
+                and tw.plant_state.tank_c < p.tank_c - 2.0):
             v.append("IL-09")
         if p.hp_max_fraction < 1.0 and "frost_protection" in overlays:
             v.append("OVL-frost:hp_cap")

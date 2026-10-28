@@ -41,8 +41,9 @@ def test_catalog_matches_its_schema():
     jsonschema.Draft202012Validator(schema).validate(CATALOG)
 
 
-def test_every_profile_overlay_and_algorithm_the_engine_emits_is_catalogued():
-    ct = ck.Caretaker(_twin(days=7))
+@pytest.mark.parametrize("overrides", [None, {"peak_budget": {"enabled": True, "kw": 12.0, "hp_full_kw_prior": 10.0}}])
+def test_every_profile_overlay_and_algorithm_the_engine_emits_is_catalogued(overrides):
+    ct = ck.Caretaker(_twin(days=7), policy_overrides=overrides)
     _run(ct, 7 * 86400 - STEP_S)
     profiles = {p["id"] for p in CATALOG["profiles"]}
     overlays = {o["id"] for o in CATALOG["overlays"]}
@@ -50,6 +51,8 @@ def test_every_profile_overlay_and_algorithm_the_engine_emits_is_catalogued():
     assert set(ck.PROFILES) <= profiles and set(ck.OVERLAYS) <= overlays
     used = {a.split("+")[0] for a in ct.stats.algorithms}
     assert used <= algos, used - algos
+    if overrides:
+        assert "peak_budget" in used
     for p in CATALOG["profiles"]:
         assert set(p["algorithms"]) <= algos
 

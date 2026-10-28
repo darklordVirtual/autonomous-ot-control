@@ -198,3 +198,13 @@ metered energy (the sheet's `MÅLEBEHOV`), with a held-out validation period
 and MAE/RMSE on temperature and energy. A pilot building's meters are the
 next source, not more certificates. Until then every savings figure is a
 property of a building built from priors.
+
+## Savings on the calibrated building
+
+The strategies run on `site-001-v2` with the peak budget, the seed ranges,
+the tariff sensitivity and the SHA-256 of every input are in the pilot
+evidence pack, `docs/results/2026-10-28/pilot-site-001/` (ADR-011). It is
+a calibrated simulation in the sense of IPMVP Option D, with the
+limitations above carried into its scope section: in-sample, monthly,
+nine months of 2026 for a savings year of 2025, and the testbed's generic
+as-found control as P0.

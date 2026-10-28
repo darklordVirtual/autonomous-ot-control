@@ -88,23 +88,31 @@ def run_one(args: tuple) -> dict[str, Any]:
     strategy, and for P3/P3raw 1 % of the proposals corrupted before validation."""
     area, strategy, seed, days, faults = args[:5]
     config = Path(args[5]) if len(args) > 5 and args[5] else CONFIG
+    tariff_id = args[6] if len(args) > 6 else None
+    scenario = Path(args[7]) if len(args) > 7 and args[7] else scenario_path(area)
+    policy_overrides = args[8] if len(args) > 8 and args[8] else None
     from runner.caretaker import Caretaker
     from runner.demo import STEP_S
     from runner.strategies import Controller
+    from runner.tariffs import apply_tariff
     from twin.model import Twin, load_config
     from twin.scenarios import load_scenario
 
-    sp = scenario_path(area)
+    sp = scenario
     raw = json.loads(sp.read_text("utf-8"))
-    raw["seed"], raw["duration_seconds"] = seed, days * 86400
+    raw["seed"] = seed
+    if days:
+        raw["duration_seconds"] = days * 86400
+    days = int(raw["duration_seconds"] // 86400)
     if faults:
         raw["disturbances"] = list(raw.get("disturbances", [])) + fault_disturbances(area, seed, days)
     sc = load_scenario(raw, base_dir=sp.parent)
-    tw = Twin(load_config(config), sc)
+    tw = Twin(apply_tariff(load_config(config), tariff_id), sc)
     ctl: Any
-    if strategy in ("P3", "P3raw"):
-        ctl = Caretaker(tw, validated=strategy == "P3", record_days=RECORD_DAYS,
-                        proposal_fault_rate=OPTIMIZER_FAULT_RATE if faults else 0.0, seed=seed)
+    if strategy in ("P3", "P3raw", "P3pb"):
+        ctl = Caretaker(tw, validated=strategy != "P3raw", record_days=RECORD_DAYS,
+                        proposal_fault_rate=OPTIMIZER_FAULT_RATE if faults else 0.0, seed=seed,
+                        policy_overrides=_with_peak_budget(policy_overrides, strategy == "P3pb"))
     else:
         ctl = Controller(strategy, tw)
     start = datetime.fromisoformat(sc.start_utc.replace("Z", "+00:00"))
@@ -155,6 +163,14 @@ def run_one(args: tuple) -> dict[str, Any]:
         out["caretaker"] = asdict(ctl.stats)
         out["records"] = ctl.records
         out["alarms"] = ctl.alarms
+    return out
+
+
+def _with_peak_budget(overrides: dict[str, Any] | None, enabled: bool) -> dict[str, Any]:
+    """P3pb is P3 with the policy's peak budget switched on (its kW come from the overrides)."""
+    out = dict(overrides or {})
+    if enabled:
+        out["peak_budget"] = {**(out.get("peak_budget") or {}), "enabled": True}
     return out
 
 
@@ -242,18 +258,30 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--strategies", nargs="+", default=["P0", "P1", "P2", "P3"],
-                   help="the first is the baseline every other is paired with")
+                   help="the first is the baseline every other is paired with; P3pb is P3 with the peak budget (ADR-011)")
     p.add_argument("--faults", action="store_true", help="seeded sensor faults in every strategy")
     p.add_argument("--config", default=str(CONFIG), help="the building (twin fixture) to run")
     p.add_argument("--areas", nargs="+", default=list(AREAS), choices=list(AREAS))
+    p.add_argument("--tariff", default=None, help="price on a registry tariff (runner.tariffs) instead of the fixture's")
+    p.add_argument("--peak-budget-kw", type=float, default=None, help="the monthly kW budget for strategy P3pb")
+    p.add_argument("--hp-full-kw-prior", type=float, default=0.0)
     a = p.parse_args(argv)
-    jobs = [(area, s, sd, a.days, a.faults, a.config) for area in a.areas for s in a.strategies for sd in a.seeds]
+    overrides = ({"peak_budget": {"kw": a.peak_budget_kw, "hp_full_kw_prior": a.hp_full_kw_prior}}
+                 if a.peak_budget_kw else None)
+    if "P3pb" in a.strategies and not a.peak_budget_kw:
+        p.error("--peak-budget-kw is required with P3pb")
+    jobs = [(area, s, sd, a.days, a.faults, a.config, a.tariff, None, overrides)
+            for area in a.areas for s in a.strategies for sd in a.seeds]
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         runs = list(ex.map(run_one, jobs))
     res = summarize(runs, a.seeds, a.strategies, a.faults)
     cfg_path = Path(a.config).resolve()
     res["config"] = cfg_path.relative_to(ROOT).as_posix() if cfg_path.is_relative_to(ROOT) else str(cfg_path)
     res["building_id"] = json.loads(cfg_path.read_text("utf-8")).get("building_id")
+    from runner.tariffs import apply_tariff, describe
+    res["tariff"] = describe(apply_tariff(json.loads(cfg_path.read_text("utf-8")), a.tariff))
+    if overrides:
+        res["policy_overrides"] = overrides
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=False)
     (out / "areas.json").write_text(json.dumps(res, indent=2), encoding="utf-8")

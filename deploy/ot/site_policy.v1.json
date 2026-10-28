@@ -26,7 +26,9 @@
     "max_observation_age_s": {"value": 600, "source": "twin guard max_observation_age_seconds", "site_required": true},
     "max_reading_jump_k_per_step": {"value": 1.5, "source": "caretaker design: largest plausible change of a zone over 15 min in the twin", "site_required": true},
     "suspect_latch_s": {"value": 86400, "source": "caretaker design: a suspect sensor stays distrusted for at least 24 h and is escalated", "site_required": true},
-    "recovery_hold_s": {"value": 3600, "source": "caretaker design: the recovery criterion (fresh again, or the reverse jump) must hold for 1 h", "site_required": true}
+    "recovery_hold_s": {"value": 3600, "source": "caretaker design: the recovery criterion (fresh again, or the reverse jump) must hold for 1 h", "site_required": true},
+    "purge_max_chiller_eer": {"value": 8.0, "source": "ADR-011: a summer night purge runs the fans at SFP to displace mechanical cooling; above this observed chiller EER (CH-01.EER, learned) the purge costs more than it saves and is skipped", "site_required": true},
+    "peak_budget": {"value": {"enabled": false, "kw_by_month": {}, "min_fraction": 0.3, "comfort_margin_k": 0.3, "tank_release_k": 1.0, "hp_full_kw_prior": 0.0, "learning_rate": 0.05}, "source": "ADR-011: a monthly hourly-mean kW budget for the grid tariff's power part; off unless a site sets it (a run passes it as a policy override, recorded by SHA-256 in every decision record)", "site_required": true}
   },
   "not_applicable": {
     "domestic_hot_water": "The twin has no domestic hot water, so no water-safety overlay runs. A site with DHW must add one (FHI and Helsedirektoratet Legionella guidance; the site's water-safety plan) above every energy profile."

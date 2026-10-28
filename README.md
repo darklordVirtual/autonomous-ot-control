@@ -17,6 +17,7 @@ repository.
 |---|---|
 | **See results** of outside runs against the testbed | [`docs/federation/RESULTS.md`](docs/federation/RESULTS.md) (generated from run records; reviewed reports below the table) |
 | **Join** with my own check, no credentials, five minutes | [Join as a federation edge](#join-as-a-federation-edge) and the [guide](docs/federation/README.md) |
+| **See the pilot evidence** on a building calibrated to real meters | [pilot-site-001/pilot.html](docs/results/2026-10-28/pilot-site-001/pilot.html) · interactive: [demo.html](docs/results/2026-10-28/pilot-site-001/demo.html) · the offer: [docs/pilot/PILOTTILBUD.md](docs/pilot/PILOTTILBUD.md) (Norwegian) |
 | **Read the reports** | Strategy A/B/C with seeded faults: [abc-2025.html](docs/results/2026-10-27/abc-2025.html) · five price areas 2025: [areas-2025.html](docs/results/2026-10-27/areas-2025.html) · governed week: [report.html](docs/results/2026-10-27/report.html) · federation A/B/C: `artifacts/abc-<run>/abc-report.html` after [`run-abc.sh`](#the-abc-report) |
 | **Check what is established**, and at what evidence level | [`docs/status.md`](docs/status.md) |
 | **Find the entry point for machines** | [`federation/index.json`](federation/index.json) |
@@ -50,7 +51,7 @@ repository.
   twin, with Statsbygg PA 0802 (TFM) naming for every data point
   ([`docs/tfm.md`](docs/tfm.md)).
 
-Design records: [`docs/adr/`](docs/adr/) (ADR-003..010).
+Design records: [`docs/adr/`](docs/adr/) (ADR-003..011).
 
 </details>
 
@@ -148,6 +149,17 @@ on unmeasured assumptions of the twin and is not the figure to quote. Each
 report opens with what drives the number. Tables, definitions of P0–P3 and the
 arms, and the reports: [`docs/strategies.md`](docs/strategies.md).
 
+**On a building calibrated to its own meters** (`site-001-v2`: a 3 562 m²
+Oslo office, ground-source heat pump, monthly CV(RMSE) 11.8 % against the
+site's meters, in-sample), 2025, three seeds, priced on Elvia's published
+2026 tariff sheet: PILOT_README_LINE The money is in the grid tariff's
+power part, which the monthly **peak budget** (ADR-011) moves: the
+compressor is capped so the hour stays under a site-set kW budget and is
+released only for comfort, frost or a tank near the backup heater. Report,
+seed ranges, lever waterfall, tariff sensitivity and the SHA-256 of every
+input: [`docs/results/2026-10-28/pilot-site-001/`](docs/results/2026-10-28/pilot-site-001/);
+the method and its limits: [`docs/strategies.md`](docs/strategies.md#results-on-a-calibrated-building-site_001-no1-2025-adr-011).
+
 Everything in the governed path is `TESTED_DOCKER`: one host, one REMORA
 replica, synthetic plant, same-deployment vantage. Real-building savings and
 physical OT safety are `NOT_ESTABLISHED`. The full capability table with the
@@ -232,8 +244,9 @@ demo, CLI proposals, the A/B/C runs, trust boundary and the upstream pin:
 twin/        model, plant (HVAC/tank/HP/AHU/lighting/cables), tfm (PA 0802), datapoints, guard, api, effect_observer
 adapter/     REMORA-free helpers: contracts (signed ToolSpec), actuation (effect primitives), verifier
 deploy/ot/   modules loaded inside REMORA: ot_registry, ot_bundle, site_policy, caretaker_fallback, limits, signer
-runner/      caretaker (P3), strategies (P0..P2), areas, demo, acceptance; federation: edge_check, federation_fixtures,
-             edge_pass, episode, oracle, ledger_metrics, arm_a, admission, ab_compare
+runner/      caretaker (P3, peak budget), strategies (P0..P2), areas, demo, acceptance; pilot evidence: pilot, report_pilot,
+             peak_sweep, report_demo, tariffs, bacs; federation: edge_check, federation_fixtures, edge_pass, episode,
+             oracle, ledger_metrics, arm_a, admission, ab_compare
 federation/  index.json (entry point), edges/_template and edges/_inline_template, external edges, sealed fixtures/v1
              (12 + 6) and fixtures/v2 (12 + 10), records/ (run records), reports.json (reviewed reports)
 contracts/   ToolSpec, tool surface, caretaker profile catalog, federation edge/case/result/run-record/fixtures/index,

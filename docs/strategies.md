@@ -19,6 +19,7 @@ tools in [datapoints.md](datapoints.md) and carries its decision record
 | P2 | P1 plus weekend/holiday setback by outdoor mean, occupancy-aware ventilation, presence lighting with daylight dimming, ground-sensor cable control, tank on the radiator curve with a cheap-hour boost and a peak limiter |
 | P3 | The caretaker profile engine: overlays, profiles, independent validator, hash-pinned fallback and FDD (`runner/caretaker.py`, ADR-009) |
 | P3raw | P3 without the independent validator, run with the same seeded sensor faults |
+| P3pb | P3 with the monthly peak budget on (ADR-011): the compressor is capped so the building's hourly mean stays under a site-set kW budget, released only for comfort, frost or a tank near the backup heater; no cheap-hour tank charge |
 
 ## Results, full year 2025
 
@@ -54,4 +55,36 @@ Reproduce without Docker:
 
 ```bash
 python -m runner.areas --seeds 177 178 179 --out artifacts/areas-2025
+```
+
+## Results on a calibrated building: SITE_001, NO1 2025 (ADR-011)
+
+The same strategies on the twin calibrated to a measured Oslo office
+(3 562 m², 1980, ground-source heat pump; `docs/calibration.md`), three
+seeds, priced on Elvia's published 2026 sheet for large low-voltage
+customers (effektledd 111 NOK/kW/month Oct–Mar, 46 Apr–Sep; `runner/tariffs.py`).
+The full pack with every table, the seed ranges, the monthly peaks, the
+tariff sensitivity and the evidence digests:
+[`results/2026-10-28/pilot-site-001/pilot.html`](results/2026-10-28/pilot-site-001/pilot.html)
+([md](results/2026-10-28/pilot-site-001/pilot.md)); the interactive page:
+[`demo.html`](results/2026-10-28/pilot-site-001/demo.html).
+
+PILOT_TABLE
+
+**Read it with care.** On this building the money is in the grid tariff's
+power part, not in kWh: the as-found control sets the month's highest
+hourly mean with the heat pump recovering after a setback, and the peak
+budget is what moves it. The kWh saving is lighting (presence and
+daylight) and a better heat-pump COP at the lower tank temperature; the
+cable lever of the demo building does not exist here. The calibration is
+in-sample and monthly, P0 is the testbed's generic as-found control, not
+the site's sequence, and whether the real compressor can be capped is a
+site question: the pack's scope section lists every such item. None of
+this is a measured saving.
+
+Reproduce without Docker (about 30 minutes on two cores):
+
+```bash
+python -m runner.pilot --config twin/fixtures/calibrated/site-001-v2.json --area NO1 \
+    --seeds 177 178 179 --strategies P0 P1 P2 P3 P3pb --peak-budget-kw 70 --out artifacts/pilot-site-001
 ```
