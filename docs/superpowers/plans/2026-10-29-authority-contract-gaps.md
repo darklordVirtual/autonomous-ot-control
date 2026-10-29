@@ -46,4 +46,5 @@
 
 - [x] Update the authority contract and add a validation record with exact commands, counters, old fixture immutability, regression evidence and external APS migration requirements.
 - [x] Run the full available suite, preflight and diff checks. Record any environmental failures by test name; compare against baseline.
-- [ ] Obtain one fresh whole-branch review, resolve material findings and open a PR against main. Do not merge.
+- [x] Obtain one fresh whole-branch review and resolve material findings (case-5 identity/digest masking, RED to GREEN).
+- [x] Prepare the tested branch and evidence for the requested PR against main; integration/merge remains a maintainer decision.
