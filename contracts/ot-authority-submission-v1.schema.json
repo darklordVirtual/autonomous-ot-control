@@ -158,9 +158,37 @@
               "pass",
               "refuse"
             ]
+          },
+          "expected_aps_reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pre-registered machine-readable verifier reason, including pass cases; never inferred from verifier output."
+          }
+        }
+      }
+    },
+    "evaluation_profile": {
+      "const": "identity-reason/v2"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "evaluation_profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cases": {
+            "items": {
+              "required": [
+                "expected_aps_reason"
+              ]
+            }
           }
         }
       }
     }
-  }
+  ]
 }

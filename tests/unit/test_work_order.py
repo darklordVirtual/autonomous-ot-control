@@ -92,10 +92,10 @@ def test_signature_covers_the_jcs_form():
 
 def test_delegation_binding_is_the_jcs_sha256():
     assert wo.delegation_sha256(DELEGATION) == jcs.sha256_hex(DELEGATION)
-    assert wo.check(_order(), _call(), KEYS, delegation=DELEGATION)["verdict"] == "pass"
+    assert wo.check(_order(), _call(), KEYS, delegation=DELEGATION, delegation_id="DLG-0001")["verdict"] == "pass"
     changed = copy.deepcopy(DELEGATION)
     changed["scope"]["assets"].append("ZONE-02")
-    r = wo.check(_order(), _call(), KEYS, delegation=changed)
+    r = wo.check(_order(), _call(), KEYS, delegation=changed, delegation_id="DLG-0001")
     assert r == {"verdict": "refuse", "reasons": ["delegation_digest_mismatch"]}
 
 
@@ -130,7 +130,7 @@ def test_the_five_issue_27_cases_on_the_work_order_side():
     o = _order()
     in_scope = _call(value=20.5)
     cases = {1: in_scope, 2: in_scope, 3: in_scope, 4: in_scope, 5: _call(value=22.5)}
-    got = {n: wo.check(o, c, KEYS, delegation=DELEGATION)["verdict"] for n, c in cases.items()}
+    got = {n: wo.check(o, c, KEYS, delegation=DELEGATION, delegation_id="DLG-0001")["verdict"] for n, c in cases.items()}
     assert got == {1: "pass", 2: "pass", 3: "pass", 4: "pass", 5: "refuse"}
 
 
@@ -138,3 +138,27 @@ def test_test_keys_are_deterministic_and_labelled():
     assert wo.issuer_test_keys() == wo.issuer_test_keys()
     assert len(wo.issuer_test_keys("a", "b")) == 2 and wo.issuer_test_keys("a")["a"] != wo.issuer_test_keys("b")["b"]
     assert "TEST-ONLY" in wo.TEST_KEY_LABEL
+
+
+def test_complete_delegation_requires_a_verifier_identity():
+    result = wo.check(_order(), _call(), KEYS, delegation=DELEGATION)
+    assert result == {"verdict": "refuse", "reasons": ["delegation_id_unavailable"]}
+
+
+def test_signed_identity_must_match_verifier_identity_even_when_digest_matches():
+    order = _order(delegation_id="WRONG-LEAF")
+    assert wo.verify_signature(order, KEYS) is None
+    result = wo.check(order, _call(), KEYS, delegation=DELEGATION, delegation_id="DLG-0001")
+    assert result == {"verdict": "refuse", "reasons": ["delegation_id_mismatch"]}
+
+
+def test_verifier_identity_does_not_replace_complete_delegation_digest():
+    changed = copy.deepcopy(DELEGATION)
+    changed["signatures"][0]["sig"] = "different-signed-chain"
+    result = wo.check(_order(), _call(), KEYS, delegation=changed, delegation_id="DLG-0001")
+    assert result == {"verdict": "refuse", "reasons": ["delegation_digest_mismatch"]}
+
+
+def test_explicit_null_delegation_cannot_skip_identity_and_digest_binding():
+    result = wo.check(_order(), _call(), KEYS, delegation=None, delegation_id="WRONG-LEAF")
+    assert result == {"verdict": "refuse", "reasons": ["delegation_id_mismatch", "delegation_digest_mismatch"]}

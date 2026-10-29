@@ -107,6 +107,10 @@
               },
               "admitted": {
                 "type": "boolean"
+              },
+              "aps_reason": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
@@ -163,6 +167,10 @@
           "minLength": 1
         }
       }
+    },
+    "evaluation_profile": {
+      "const": "identity-reason/v2",
+      "description": "Opt-in sealed strict identity and reason expectations; legacy sets have no profile."
     }
   },
   "$defs": {
@@ -174,5 +182,29 @@
         "pattern": "^[A-Za-z0-9_-]{43}$"
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "evaluation_profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cases": {
+            "items": {
+              "properties": {
+                "expected": {
+                  "required": [
+                    "aps_reason"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

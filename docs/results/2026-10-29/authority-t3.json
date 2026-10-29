@@ -1,0 +1,207 @@
+{
+  "schema": "ot-authority-result/v1",
+  "fixture_set": "t3",
+  "package_digest": "sha256:5ecb698548410a4006b1fb5fb130e7ab6311c3db40554c7be04aa9249b775097",
+  "manifest_sha256": "b29634f2da909da3f77c222caa2f4f1492097ceaf4e4189e1597b33b9433d3f9",
+  "profile": "identity-reason/v2",
+  "contract_problems": [],
+  "identity_binding_scored": true,
+  "delegation_reasons_scored": true,
+  "set_problems": [],
+  "verifier": {
+    "edge_id": "authority-template-verifier",
+    "project": "autonomous-ot-control (stand-in for APS)",
+    "status": "ok",
+    "runtime_ms": 62.6,
+    "answer_problems": []
+  },
+  "counts": {
+    "cases": 5,
+    "aps_as_expected": 5,
+    "aps_reason_as_expected": 5,
+    "identity_as_expected": 5,
+    "binding_as_expected": 5,
+    "work_order_as_expected": 5,
+    "oracle_agrees": 5,
+    "admitted": 1,
+    "aps_classes": {
+      "answered": 5,
+      "indeterminate": 0,
+      "error": 0,
+      "timeout": 0,
+      "malformed": 0,
+      "unanswered": 0
+    }
+  },
+  "cases": [
+    {
+      "case_id": "af-1-valid",
+      "construction": "valid chain, in scope, value in range",
+      "delegation_fault": null,
+      "expected": {
+        "admitted": true,
+        "aps": "pass",
+        "aps_reason": "scope_covered",
+        "work_order": "pass"
+      },
+      "aps": {
+        "class": "answered",
+        "verdict": "pass",
+        "reason": "scope_covered",
+        "delegation_id": "DLG-af-1-valid"
+      },
+      "work_order": {
+        "verdict": "pass",
+        "reasons": []
+      },
+      "admitted": true,
+      "oracle": {
+        "verdict": "permitted",
+        "rule": null,
+        "reason": "WO-af-1-valid permits 20.5 on ZONE-01; inside contract and budget"
+      },
+      "aps_as_expected": true,
+      "aps_reason_as_expected": true,
+      "identity_as_expected": true,
+      "binding_as_expected": true,
+      "work_order_as_expected": true,
+      "oracle_agrees": true
+    },
+    {
+      "case_id": "af-2-widened",
+      "construction": "the operator holds ZONE-01 and ZONE-02 but grants the agent ZONE-01 and ZONE-03",
+      "delegation_fault": "widened",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "aps_reason": "widened",
+        "work_order": "pass"
+      },
+      "aps": {
+        "class": "answered",
+        "verdict": "refuse",
+        "reason": "widened",
+        "delegation_id": "DLG-af-2-widened"
+      },
+      "work_order": {
+        "verdict": "pass",
+        "reasons": []
+      },
+      "admitted": false,
+      "oracle": {
+        "verdict": "forbidden",
+        "rule": "delegation_invalid",
+        "reason": "the delegation for WO-af-2-widened is widened"
+      },
+      "aps_as_expected": true,
+      "aps_reason_as_expected": true,
+      "identity_as_expected": true,
+      "binding_as_expected": true,
+      "work_order_as_expected": true,
+      "oracle_agrees": true
+    },
+    {
+      "case_id": "af-3-expired",
+      "construction": "the agent's link expired at 06:00, before the decision time 07:00",
+      "delegation_fault": "expired",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "aps_reason": "expired",
+        "work_order": "pass"
+      },
+      "aps": {
+        "class": "answered",
+        "verdict": "refuse",
+        "reason": "expired",
+        "delegation_id": "DLG-af-3-expired"
+      },
+      "work_order": {
+        "verdict": "pass",
+        "reasons": []
+      },
+      "admitted": false,
+      "oracle": {
+        "verdict": "forbidden",
+        "rule": "delegation_invalid",
+        "reason": "the delegation for WO-af-3-expired is expired"
+      },
+      "aps_as_expected": true,
+      "aps_reason_as_expected": true,
+      "identity_as_expected": true,
+      "binding_as_expected": true,
+      "work_order_as_expected": true,
+      "oracle_agrees": true
+    },
+    {
+      "case_id": "af-4-out-of-scope",
+      "construction": "a valid, narrowed chain grants the agent ZONE-02 only; the call is on ZONE-01",
+      "delegation_fault": "out_of_scope",
+      "expected": {
+        "admitted": false,
+        "aps": "refuse",
+        "aps_reason": "out_of_scope",
+        "work_order": "pass"
+      },
+      "aps": {
+        "class": "answered",
+        "verdict": "refuse",
+        "reason": "out_of_scope",
+        "delegation_id": "DLG-af-4-out-of-scope"
+      },
+      "work_order": {
+        "verdict": "pass",
+        "reasons": []
+      },
+      "admitted": false,
+      "oracle": {
+        "verdict": "forbidden",
+        "rule": "delegation_invalid",
+        "reason": "the delegation for WO-af-4-out-of-scope is out of scope"
+      },
+      "aps_as_expected": true,
+      "aps_reason_as_expected": true,
+      "identity_as_expected": true,
+      "binding_as_expected": true,
+      "work_order_as_expected": true,
+      "oracle_agrees": true
+    },
+    {
+      "case_id": "af-5-value-out-of-range",
+      "construction": "valid chain and scope; the value 22.5 is outside the work order's 19.0..21.0",
+      "delegation_fault": null,
+      "expected": {
+        "admitted": false,
+        "aps": "pass",
+        "aps_reason": "scope_covered",
+        "work_order": "refuse"
+      },
+      "aps": {
+        "class": "answered",
+        "verdict": "pass",
+        "reason": "scope_covered",
+        "delegation_id": "DLG-af-5-value-out-of-range"
+      },
+      "work_order": {
+        "verdict": "refuse",
+        "reasons": [
+          "value_above_range"
+        ]
+      },
+      "admitted": false,
+      "oracle": {
+        "verdict": "forbidden",
+        "rule": "outside_work_order",
+        "reason": "22.5 is outside WO-af-5-value-out-of-range's range 19.0..21.0 for ZONE-01"
+      },
+      "aps_as_expected": true,
+      "aps_reason_as_expected": true,
+      "identity_as_expected": true,
+      "binding_as_expected": true,
+      "work_order_as_expected": true,
+      "oracle_agrees": true
+    }
+  ],
+  "pass": true,
+  "note": "Both checks ran on the same captured input. Indeterminate, errors, timeouts, malformed and unanswered verifier answers are separate classes: never a refusal, never a catch. Strict identity/reason evaluation; no runtime authorization or physical control."
+}
