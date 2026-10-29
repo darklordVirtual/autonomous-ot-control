@@ -4,45 +4,43 @@
 
 ## Proposed public post (English)
 
-> **Audience-first draft:** Names are defined in plain language before the technical experiment. Credits describe different work without implying a single joint implementation. GitHub @handles are placeholders for human-verified LinkedIn tags.
+> **Audience-first draft:** Names are explained before the technical experiment. GitHub handles need to be replaced with verified LinkedIn profiles before posting.
 
-**Would you let AI adjust the heating in your office building?**
+**Would you let an AI agent change the heating in your office building?**
 
-AI could help buildings use less energy, respond faster to problems and reduce operating costs. But before it changes a temperature or starts equipment, we need answers to three questions:
+It might save energy. But what if it requests a temperature outside the agreed limits? Who gave it permission — and who can stop it?
 
-**Who gave the AI permission? Is this specific change allowed? How can we check what happened?**
+That's what we're testing in an open-source collaboration.
 
-Two independent open-source projects are exploring different parts of that challenge:
+**Agent Passport System (APS)**, led by **@aeoess**, works like a verifiable permission slip for AI agents. It checks *who delegated authority, what it covers and when it expires*.
 
-**Agent Passport System (APS)**, led by **@aeoess**, verifies digitally signed *delegated authority*: who gave an AI agent permission, which operations it covers and when it expires.
+**REMORA**, led by **@darklordVirtual**, is a governance and evidence platform for AI actions. It's designed to apply defined rules, limits and approvals — and leave an auditable record.
 
-**REMORA**, led by **@darklordVirtual**, is a governance platform for AI-initiated actions, designed to apply signed rules, limits and approvals and preserve auditable evidence of decisions and outcomes.
+Our **building automation testbed** is the safe testing ground: a *digital simulation*, not a connection to a real building.
 
-Our **building automation testbed** is a simulated building where these ideas can be tested safely, without controlling real heating or ventilation equipment.
+**What happened in our first experiment?**
 
-**What did we test together?**
+APS checked digitally signed delegations. The testbed separately checked a signed work order, including the allowed temperature range.
 
-APS supplied signed delegation examples and its own verifier. The testbed checked a separate signed *work order*: whether the requested building change and value were locally allowed.
+Across **five offline scenarios**, every result matched the expected outcome: **one simulated action admitted, four refused**.
 
-We ran **five synthetic scenarios**. All five matched the expected results: **one simulated action admitted, four refused**.
+The revealing case: the AI agent had valid delegated authority, but requested a temperature outside the approved range. **APS accepted the delegation. The local work-order check refused the change.** Different checks, different questions.
 
-The revealing case? An AI agent had **valid delegated permission**, but requested a temperature outside the approved work-order range. **APS accepted the delegation; the local work-order check refused the change.** Permission to act is not permission to do anything.
+During review, @darklordVirtual flagged a mismatch in verifier identity metadata; @aeoess corrected it before the contribution was merged.
 
-Public review also caught a mismatch in the verifier's identity metadata, which APS corrected before the contribution was merged.
+**Credit matters.** @aeoess provided the APS examples and verifier; @darklordVirtual provided the OT test harness, work-order checks and reproducible evaluation. Separate testbed work by **@astrogilda** (effect evidence), **@giskard09** (external reproduction), **@altrudev** (runner failure checks) and **@Tetsurohhori** (reader and mutation testing) has also helped challenge the evidence — but was not part of the APS experiment.
 
-**Credit where it's due:** @aeoess contributed the APS fixtures and verifier; @darklordVirtual contributed the OT test harness and local authorization checks. Other contributors — **@astrogilda, @giskard09, @altrudev and @Tetsurohhori** — have independently examined *different* evidence and test-runner boundaries in this testbed. Their work is distinct from the APS experiment.
+The wider **Agent Governance Vocabulary** collaboration credits **@QueBallSharken, @douglasborthwick-crypto, @MoltyCel** and other contributors for shared terminology and mappings.
 
-The broader **Agent Governance Vocabulary** collaboration also credits **@QueBallSharken, @douglasborthwick-crypto, @MoltyCel** and many other contributors for shared terminology and mappings.
+**Important:** These tests are synthetic and offline. They don't demonstrate live building control, production safety or an added security benefit from APS over REMORA. Inline integration remains future work.
 
-**The limits matter:** These are offline tests with synthetic data, **not** real building control. APS was not yet integrated into live REMORA decision-making, and we have not established that adding APS provides extra protection compared with REMORA alone.
-
-We welcome engineers, independent reviewers and potential pilot partners who want to explore how trustworthy AI could work in real operations.
+We're looking for more people to test the claims, challenge the results and explore future pilot opportunities.
 
 **See the evidence:**
 https://github.com/darklordVirtual/autonomous-ot-control/pull/35
 https://github.com/darklordVirtual/autonomous-ot-control/blob/main/docs/results/2026-10-28/aps-authority.md
 
-#AgenticAI #AIGovernance #OpenSource #BuildingAutomation #REMORA
+#AIGovernance #AgenticAI #OpenSource #BuildingAutomation
 
 ---
 
