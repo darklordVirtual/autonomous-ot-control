@@ -123,14 +123,18 @@ def verify_signature(work_order: dict[str, Any], issuer_keys: dict[str, str]) ->
 
 REQUIRED = ("schema", "work_order_id", "building_id", "asset", "parameter", "operation", "value_range",
             "valid_from", "valid_until", "delegation_id", "delegation_sha256", "issuer", "signature")
+_NO_DELEGATION = object()  # An explicit JSON null is still a supplied value and must not skip binding.
 
 
 def check(work_order: dict[str, Any], call: dict[str, Any], issuer_keys: dict[str, str], *,
-          delegation: Any = None) -> dict[str, Any]:
+          delegation: Any = _NO_DELEGATION, delegation_id: str | None = None,
+          legacy_digest_only: bool = False) -> dict[str, Any]:
     """The work-order check: ``pass`` or ``refuse`` with every reason found, never an authorization.
 
     With ``delegation`` given, the work order must also bind exactly that delegation
-    (its JCS SHA-256). The delegation's own validity and scope are APS's check, not this one.
+    (its JCS SHA-256) and match the opaque identity returned by the delegation verifier.
+    This function never parses the delegation format or determines chain validity/scope.
+    ``legacy_digest_only`` is exclusively for labelled historical offline reproduction.
     """
     reasons: list[str] = []
     missing = [k for k in REQUIRED if k not in work_order]
@@ -159,7 +163,12 @@ def check(work_order: dict[str, Any], call: dict[str, Any], issuer_keys: dict[st
         reasons.append("value_below_range")
     elif value > hi:
         reasons.append("value_above_range")
-    if delegation is not None:
+    if delegation is not _NO_DELEGATION:
+        if not legacy_digest_only:
+            if not isinstance(delegation_id, str) or not delegation_id.strip():
+                reasons.append("delegation_id_unavailable")
+            elif delegation_id != work_order.get("delegation_id"):
+                reasons.append("delegation_id_mismatch")
         try:
             if delegation_sha256(delegation) != work_order.get("delegation_sha256"):
                 reasons.append("delegation_digest_mismatch")

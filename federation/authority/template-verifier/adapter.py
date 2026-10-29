@@ -83,7 +83,7 @@ def decide(case: dict, roots: dict[str, str], keys: dict[str, str]) -> tuple[str
     leaf = chain[-1]["scope"]
     if call.get("building_id") != leaf.get("building_id") or any(call.get(f) not in (leaf.get(k) or []) for f, k in LISTS):
         return "refuse", "out_of_scope"
-    return "pass", "valid chain; the call is inside the granted scope"
+    return "pass", "scope_covered"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -100,7 +100,12 @@ def main(argv: list[str] | None = None) -> int:
     for path in sorted((fx / "cases").glob("*.json")):
         case = json.loads(path.read_text("utf-8"))
         v, reason = decide(case, roots, keys)
-        verdicts.append({"case_id": case["case_id"], "verdict": v, "reason": reason})
+        # This is the identity in our own stand-in format. APS extracts its leaf id in its own
+        # verifier; the local work-order checker never parses either delegation format.
+        delegation = case.get("delegation")
+        identity = delegation.get("delegation_id") if isinstance(delegation, dict) else None
+        verdicts.append({"case_id": case["case_id"], "verdict": v, "reason": reason,
+                         "delegation_id": identity})
     Path(a.out).write_text(json.dumps({"edge_id": "authority-template-verifier", "verdicts": verdicts}, indent=2) + "\n",
                            "utf-8")
     return 0

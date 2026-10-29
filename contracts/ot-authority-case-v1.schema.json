@@ -32,7 +32,7 @@
       "$ref": "ot-work-order-v1.schema.json"
     },
     "delegation": {
-      "description": "The complete signed delegation, in its owner's format."
+      "description": "The complete signed delegation chain, signatures included, in its owner's format. APS supplies a root-to-leaf JSON array; the testbed treats it as opaque."
     }
   }
 }

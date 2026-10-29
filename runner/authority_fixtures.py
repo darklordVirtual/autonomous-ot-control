@@ -1,6 +1,6 @@
 """Authority-fixture sets: the five cases of issue #27, built and sealed.
 
-    python -m runner.authority_fixtures build --out federation/authority/fixtures/t2
+    python -m runner.authority_fixtures build --out federation/authority/fixtures/t3
     python -m runner.authority_fixtures assemble --submission <dir>/submission.json --out <set dir>
     python -m runner.authority_fixtures check <set dir>
 
@@ -8,7 +8,7 @@
 case's complete signed delegation and a line saying how it was built
 (``ot-authority-submission/v1``); the testbed writes and signs the work order
 that binds it (delegation_id and its JCS SHA-256), fixes the expected outcomes
-and seals the set. The delegation is never changed or re-encoded.
+and seals the set. The parsed delegation JSON value is preserved; its signed content is bound by JCS.
 
 Each case carries the normalized call, the testbed's signed work order and a
 delegation, and the manifest fixes the expected outcome of both checks before
@@ -25,7 +25,7 @@ any verifier runs (docs/federation/authority-fixture-contract.md):
 The delegation format here, ``ot-test-delegation/v1``, is the testbed's
 **stand-in**, not APS's: a chain of links, each signed by its delegator with
 a test-only Ed25519 key over JCS. It exists so the harness runs end to end
-before APS's fixtures arrive; APS's own delegations and verifier replace it
+as a local regression control; APS's own delegations and verifier are evaluated separately
 (the work orders bind whatever delegation object they are given by its JCS
 SHA-256). The ground truth of every case comes from how it was built.
 """
@@ -43,13 +43,18 @@ from runner import jcs
 from runner import work_order as wo
 
 SET_SCHEMA = "ot-authority-fixtures/v1"
-CURRENT_SET = "t2"
+CURRENT_SET = "t3"
+STRICT_PROFILE = "identity-reason/v2"
 #: Sets this builder's current set replaces, kept unchanged in the repository. t1 was sealed on Windows with
 #: CRLF line endings (the writer did not force LF), so its bytes, digests and package digest are those of CRLF
 #: files and a rebuild on Linux cannot reproduce them; t2 is the same five cases written with LF.
 SUPERSEDES = {"t2": {"fixture_set": "t1", "package_digest": "sha256:f326b85e2822d885258fa57e567a894d5f8e48d022b23e236039fdcf00c0e479",
                      "reason": "t1 was written with CRLF line endings on Windows and cannot be rebuilt byte for "
                                "byte on Linux; t2 holds the same five cases, same JSON, written with LF"}}
+SUPERSEDES["t3"] = {"fixture_set": "t2",
+                    "package_digest": "sha256:984b6d4d324a4735700ecb0c66899d12b3d9bf6390e90078dcdd48bef7bdaac4",
+                    "reason": "t3 registers delegation reasons and scores verifier identity; its package digest "
+                              "also binds all manifest metadata. Historical t1, t2 and aps-1 remain unchanged."}
 CASE_SCHEMA = "ot-authority-case/v1"
 DELEGATION_SCHEMA = "ot-test-delegation/v1"
 BUILDING = "demo-building-001"
@@ -122,6 +127,13 @@ def package_digest(files: list[dict[str, str]]) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def manifest_package_digest(manifest: dict[str, Any]) -> str:
+    """Strict sets bind expectations and trust metadata too; old seals retain their exact rule."""
+    if manifest.get("evaluation_profile") == STRICT_PROFILE:
+        return "sha256:" + jcs.sha256_hex({k: v for k, v in manifest.items() if k != "package_digest"})
+    return package_digest(manifest["files"])
+
+
 def build(out: Path, set_id: str = CURRENT_SET) -> dict[str, Any]:
     if out.exists():
         shutil.rmtree(out)
@@ -148,6 +160,12 @@ def build(out: Path, set_id: str = CURRENT_SET) -> dict[str, Any]:
     }
     if set_id in SUPERSEDES:
         manifest["supersedes"] = SUPERSEDES[set_id]
+    if set_id not in ("t1", "t2"):
+        manifest["evaluation_profile"] = STRICT_PROFILE
+        for entry in entries:
+            entry["expected"]["aps_reason"] = entry["delegation_fault"] or "scope_covered"
+        manifest["package_digest_rule"] = "sha256 over RFC 8785 JCS(manifest without package_digest)"
+        manifest["package_digest"] = manifest_package_digest(manifest)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", "utf-8", newline="\n")
     return manifest
 
@@ -190,8 +208,9 @@ def check(set_dir: Path) -> list[str]:
             problems.append(f"missing {f['path']}")
         elif _sha(p) != f["sha256"]:
             problems.append(f"changed {f['path']}")
-    if package_digest(m.get("files", [])) != m.get("package_digest"):
-        problems.append("package digest does not match the files list")
+    if manifest_package_digest(m) != m.get("package_digest"):
+        problems.append("package digest does not match the sealed metadata and files" if m.get("evaluation_profile")
+                        else "package digest does not match the files list")
     listed = {f"cases/{c['case_id']}.json" for c in m.get("cases", [])}
     present = {f"cases/{p.name}" for p in (set_dir / "cases").glob("*.json")}
     sealed = {f["path"] for f in m["files"]}
@@ -250,7 +269,10 @@ def assemble(submission: Path, out: Path) -> dict[str, Any]:
                          "delegation_id": c["delegation_id"], "delegation_sha256": wo.delegation_sha256(dlg)},
                         wo.issuer_test_key(), wo.TEST_ISSUER)
         # The work order is the testbed's own construction: check that it is what the submission says it is.
-        built = wo.check(order, call, wo.issuer_test_keys(), delegation=dlg)["verdict"]
+        # Construction sanity check only: the external verifier must independently return this id
+        # during evaluation; using the submission's id here does not verify its delegation semantics.
+        built = wo.check(order, call, wo.issuer_test_keys(), delegation=dlg,
+                         delegation_id=c["delegation_id"])["verdict"]
         if built != c["expected_work_order"]:
             raise SystemExit(f"{c['case_id']}: the work order built from this submission gives {built}, "
                              f"the submission says {c['expected_work_order']}")
@@ -262,6 +284,8 @@ def assemble(submission: Path, out: Path) -> dict[str, Any]:
         entries.append({"case_id": c["case_id"], "construction": c["construction"], "delegation_fault": fault,
                         "expected": {"aps": aps, "work_order": c["expected_work_order"],
                                      "admitted": aps == "pass" and c["expected_work_order"] == "pass"}})
+        if sub.get("evaluation_profile") == STRICT_PROFILE:
+            entries[-1]["expected"]["aps_reason"] = c["expected_aps_reason"]
     files = [{"path": f"cases/{p.name}", "sha256": _sha(p)} for p in sorted((out / "cases").glob("*.json"))]
     manifest = {"schema": SET_SCHEMA, "fixture_set": sub["set_id"], "contract": "docs/federation/authority-fixture-contract.md",
                 "scope": sub.get("scope", "Supplied delegations against testbed-signed work orders on the simulated "
@@ -275,6 +299,10 @@ def assemble(submission: Path, out: Path) -> dict[str, Any]:
     for k in ("delegation_root_keys", "delegation_signer_keys", "delegation_keys_ref"):
         if k in sub:
             manifest[k] = sub[k]
+    if sub.get("evaluation_profile") == STRICT_PROFILE:
+        manifest["evaluation_profile"] = STRICT_PROFILE
+        manifest["package_digest_rule"] = "sha256 over RFC 8785 JCS(manifest without package_digest)"
+        manifest["package_digest"] = manifest_package_digest(manifest)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", "utf-8", newline="\n")
     problems = check(out)
     if problems:

@@ -14,7 +14,7 @@
 | Check | Owner | Decides | Never decides |
 |---|---|---|---|
 | Delegation | APS (its verifier, pinned in the APS repository) | The chain is valid (no child widens its parent, nothing expired at `decision_time`). The call's building, asset, parameter and operation are inside the granted scope. | The value range, plant limits, the work order |
-| Work order | The testbed (`runner.work_order.check`) | The signature holds. `decision_time` is inside the order's window. The call matches the order's building, asset, parameter and operation, and its value is inside the order's range. The order binds the delegation presented. | The delegation chain's validity or scope |
+| Work order | The testbed (`runner.work_order.check`) | The signature holds. `decision_time` is inside the order's window. The call matches the order's building, asset, parameter and operation, and its value is inside the order's range. The order binds the complete signed delegation chain by JCS digest, and its `delegation_id` must equal the opaque identity returned by the verifier (APS: the leaf id). | The delegation chain's validity or scope |
 
 Both checks evaluate the **same normalized call**. In the A/B/C composition,
 each is an added refusal after REMORA and the reviewer (ADR-004,
@@ -33,7 +33,7 @@ The testbed derives it from a proposal's tool call
 | `parameter` | `setpoint_c` |
 | `operation` | the tool id, `set_zone_setpoint` |
 | `value`, `unit` | `arguments.setpoint_c`, `degC` |
-| `decision_time` | UTC, `YYYY-MM-DDTHH:MM:SSZ`. Fixed per fixture. In the harness it is the episode's start plus the simulated seconds (`runner.work_order.decision_time`), never the wall clock. |
+| `decision_time` | UTC, `YYYY-MM-DDTHH:MM:SSZ`. Fixed per fixture. For simulated episodes it is the episode start plus simulated seconds (`runner.work_order.decision_time`), never the wall clock. This fixture clock does not replace REMORA runtime authorization/lease clocks. APS converts this normalized UTC time to milliseconds. |
 
 ```json
 {"schema": "ot-normalized-call/v1", "building_id": "demo-building-001", "asset": "ZONE-01",
@@ -44,8 +44,9 @@ The testbed derives it from a proposal's tool call
 ## 2. The delegation scope (APS)
 
 The scope covers building, asset, parameter and operation, and carries **no
-value range**. Its encoding and validity window are APS's to define in the
-delegation format. The testbed needs only that the four fields match the
+value range**. APS supplies a complete signed root-to-leaf chain. Its identity is the leaf's
+ID; one exact scope grant is `ot:<building_id>:<asset>:<parameter>:<operation>`.
+Its validity window is APS's to define in the delegation format. The testbed needs only that the four fields match the
 normalized call by **exact string equality**. There are no wildcards in v1.
 
 ```json
@@ -68,7 +69,7 @@ Schema: [`contracts/ot-work-order-v1.schema.json`](../../contracts/ot-work-order
   "valid_from": "2026-01-15T00:00:00Z",
   "valid_until": "2026-01-16T00:00:00Z",
   "delegation_id": "<from the delegation>",
-  "delegation_sha256": "<SHA-256 of JCS(complete signed delegation)>",
+  "delegation_sha256": "<SHA-256 of JCS(complete signed delegation chain)>",
   "issuer": "testbed-test-key-1",
   "signature": "<Ed25519 over JCS(work order without signature), base64url>"
 }
@@ -77,8 +78,12 @@ Schema: [`contracts/ot-work-order-v1.schema.json`](../../contracts/ot-work-order
 - `value_range` is inclusive at both ends. `valid_from` is inclusive and
   `valid_until` exclusive.
 - **Binding.** `delegation_id`, plus `delegation_sha256`: lowercase hex
-  SHA-256 over the RFC 8785 JCS bytes of the **complete signed delegation**,
-  signatures included.
+  SHA-256 over the RFC 8785 JCS bytes of the **complete signed delegation chain**, signatures included. For APS this is the
+  complete root-to-leaf JSON array, not just the leaf or an unsigned payload.
+  The testbed stand-in hashes its complete signed-chain wrapper. The verifier
+  extracts `delegation_id` from that supplied object; the work-order checker
+  treats the returned ID as opaque and compares it by exact string equality.
+  It never parses APS or borrows the ID from the work order as verification.
 - **Signature.** Ed25519 over the JCS bytes of every member except
   `signature`. The signature is written as base64url without padding (86
   characters).
@@ -151,33 +156,48 @@ pins the work-order column.)
 | Set | State | Package digest |
 |---|---|---|
 | `t1` | **superseded, kept unchanged.** It was sealed on Windows by a writer that did not force LF, so its files are CRLF. Its own digests still hold (`check` passes), but a rebuild on Linux cannot reproduce its bytes. | `sha256:f326b85e2822d885258fa57e567a894d5f8e48d022b23e236039fdcf00c0e479` |
-| `t2` | **current.** The same five cases and the same JSON, written with LF; its manifest names `t1` under `supersedes`. Rebuilt byte for byte in CI. | `sha256:984b6d4d324a4735700ecb0c66899d12b3d9bf6390e90078dcdd48bef7bdaac4` |
+| `t2` | **historical, kept unchanged.** The same five cases and the same JSON, written with LF; its manifest names `t1` under `supersedes`. Rebuilt byte for byte in CI. | `sha256:984b6d4d324a4735700ecb0c66899d12b3d9bf6390e90078dcdd48bef7bdaac4` |
+| `t3` | **current strict stand-in.** Same case bytes as `t2`, new sealed profile `identity-reason/v2`, registered delegation reasons, and verifier identity binding. Supersedes `t2`; all manifest metadata is bound by the new package digest. | `sha256:5ecb698548410a4006b1fb5fb130e7ab6311c3db40554c7be04aa9249b775097` |
 
 Every writer of sealed or hashed files forces LF (`newline="\n"`), a test fails if the builder writes a carriage return on any platform, and `.gitattributes` marks the sealed fixture directories `-text` so git never converts their line endings. A sealed set is never re-sealed in place: a new set replaces it and says so.
 
 ## Running the harness
 
 ```bash
-python -m runner.authority_fixtures check federation/authority/fixtures/t2   # sealed, unchanged
-python -m runner.authority_harness --fixtures federation/authority/fixtures/t2     --verifier federation/authority/template-verifier --out /tmp/authority
+python -m runner.authority_fixtures check federation/authority/fixtures/t3
+python -m runner.authority_harness --fixtures federation/authority/fixtures/t3 \
+  --verifier federation/authority/template-verifier --out /tmp/authority-t3
 ```
 
 The harness runs these steps:
 
 1. It checks the set's seal.
 2. It runs the verifier once over the set, as a subprocess with the scorer's
-   timeout. Its answer per case is `pass` or `refuse`.
+   timeout. Its answer per case is `pass`, `refuse`, or `indeterminate`, with a
+   machine-readable `reason`. For pass/refuse it also returns `delegation_id`
+   extracted from the supplied delegation, including refusal cases when the
+   chain identity can be read. If identity cannot be extracted, use null;
+   strict local binding cannot pass that case.
 3. It runs the testbed's work-order check on the same call, work order and
    delegation.
 4. It asks the oracle about the same call. The oracle's input is how the
    case was built (`delegation_fault`) and the work order's range, never
    either verdict.
 
-It writes `authority-result.json` and `.md`. It passes only if every column
-matches the manifest. Errors, timeouts, malformed answers and unanswered
-cases are counted as their own classes, never as refusals.
+It writes `authority-result.json` and `.md`. Strict evaluation passes only if the sealed `identity-reason/v2` profile,
+verdicts, registered reasons, identity binding and oracle all agree. Missing
+or blank reasons make a strict answer malformed. Missing/invalid identity
+produces local `delegation_id_unavailable`; mismatch gives
+`delegation_id_mismatch`, independently of the chain digest.
+Identity and complete signed-chain binding are scored independently on **every**
+case: an expected value-range refusal must not hide an unavailable/mismatched
+ID, invalid work-order signature, unknown issuer, or delegation-digest error.
+`indeterminate` has its own class and a null scored verdict. It is never a
+policy refusal, catch or admission. Errors, timeouts, malformed and
+unanswered results likewise remain separate. Unknown/duplicate answers or
+a broken seal prevent a passing evaluation and all combined admissions.
 
-**Replacing the stand-in.** The set `t2` uses `ot-test-delegation/v1`, the
+**Replacing the stand-in.** The set `t3` uses `ot-test-delegation/v1`, the
 testbed's own two-link chain format, so the harness runs end to end today.
 APS's own delegations and verifier replace it. The stand-in then stays only
 as the harness's own regression test.
@@ -202,10 +222,15 @@ themselves.
      `decision_time`) and `expected_work_order` (`pass`/`refuse`).
      Optional `work_order` overrides set the asset, the range and the window;
      the defaults are the call's asset, 19.0–21.0 °C and the decision day.
+   - For a strict new submission, set `evaluation_profile: "identity-reason/v2"`
+     and supply `expected_aps_reason` for **every** case, including passes.
+     The testbed seals these expectations as `expected.aps_reason`. The
+     submitter declares them before evaluation, never from verifier output.
 2. **The testbed assembles and seals the set:**
    `python -m runner.authority_fixtures assemble --submission <dir>/submission.json --out federation/authority/fixtures/<set>`.
-   - Each delegation is carried byte-for-byte as parsed JSON, never
-     re-encoded, and bound by its JCS SHA-256.
+   - The parsed JSON delegation value is preserved and bound by its JCS
+     SHA-256; assembling the enclosing fixture regenerates JSON serialization,
+     so original source-file whitespace is not a byte-for-byte guarantee.
    - The expected delegation verdict is `refuse` exactly when
      `delegation_fault` is set.
    - The assembly is refused if a work order built from the submission does
@@ -214,7 +239,9 @@ themselves.
 3. **A verifier directory** with an `edge.json` and an entrypoint that takes
    `run --fixtures <set dir> --out <result.json>`. It writes
    [`ot-authority-verifier-result/v1`](../../contracts/ot-authority-verifier-result-v1.schema.json):
-   one `{case_id, verdict: pass|refuse, reason}` per case. The verifier itself
+   one `{case_id, verdict: pass|refuse|indeterminate, reason, delegation_id}` per
+   case. `reason` is a stable machine-readable code, scored by exact equality
+   against a pre-registered expectation; free-form text must not replace it. The verifier itself
    can stay in APS's repository; the directory only pins and calls it.
    The harness records the following as answer problems, and each one fails
    the run:
@@ -240,11 +267,52 @@ delegation check.
 | This contract, the two schemas | proposed (this page) |
 | RFC 8785 JCS (`runner/jcs.py`) | done, tested against RFC 8785 vectors |
 | Normalized call, Ed25519 test-key signing, the work-order check (`runner/work_order.py`) | done, tested |
-| Offline `authority_fixture` harness (both verdicts per case, errors as their own class) (`runner/authority_harness.py`) | done, tested; passes on `t1` with the stand-in verifier |
-| The five cases as a sealed set (`federation/authority/fixtures/t2`, built by `runner/authority_fixtures.py`) and a stand-in delegation verifier (`federation/authority/template-verifier`) | done; **the delegation format and verifier are the testbed's stand-ins, not APS's** |
+| Offline `authority_fixture` harness (both verdicts per case, errors as their own class) (`runner/authority_harness.py`) | done, tested; strict `t3` scores identity and registered reasons; legacy reproduction is explicitly labelled |
+| The five cases as a sealed set (`federation/authority/fixtures/t3`, built by `runner/authority_fixtures.py`) and a stand-in delegation verifier (`federation/authority/template-verifier`) | done; **the delegation format and verifier are the testbed's stand-ins, not APS's** |
 | Oracle: value-range support, pre-registered `delegation_invalid` rule and precedence (`runner/oracle.py`) | done, tested |
 | Shadow evaluation on every proposal (`runner.demo --shadow-edge`, `SHADOW_EDGES` in `run-abc.sh`; four-cell matrix, false refusals, unavailable and latency in the A/B/C report) | done, tested on simulated stacks; not yet run on Docker with an APS verifier |
 | Pins in the episode and run manifest: REMORA commit and lock, **REMORA's mode flags** (WS1 mode and admission, flow control, clock skew, signature and binding policy, limits, registry and bundle modules, intent source; unset ones named with their default, e.g. WS1 `off`, admission `legacy`) and a digest of the `remora` service's environment block, ToolSpec, limits policy and oracle digests, initial twin state, seeds (none; the stream is deterministic). `runner.episode check` fails on drift; each governed arm records its own pins, the flags its stack actually resolved (`docker compose config`, allow-listed, never a secret), and whether both match the episode | done, tested |
 | Schemas for sets, cases, submissions and verifier results; `assemble` for APS's delegations; harness answer problems (unknown, duplicate, malformed) and `--timeout` | done, tested |
-| APS submission `aps-1` and verifier `aps` (PR #35): sealed as `federation/authority/fixtures/aps-1` (`sha256:cf5cdbf3…`); the author's run 5/5 in their CI at `b1e9f0a`, reproduced on this testbed's host at `4b3e25c` in the Docker sandbox, image by digest, without `--trust-edge`: delegation 5/5, work order 5/5, oracle 5/5, admitted 1 ([result](../results/2026-10-28/aps-authority.md)) | done, reproduced |
+| APS submission `aps-1` and verifier `aps` (PR #35): sealed as `federation/authority/fixtures/aps-1` (`sha256:cf5cdbf3…`); the author's run 5/5 in their CI at `b1e9f0a`, reproduced on this testbed's host at `4b3e25c` in the Docker sandbox, image by digest, without `--trust-edge`: delegation 5/5, work order 5/5, oracle 5/5, admitted 1 ([result](../results/2026-10-28/aps-authority.md)) | historical verdict-only result, preserved unchanged; strict APS migration pending |
 | Inline integration | after APS has reviewed the offline results |
+
+
+## Strict evaluation and historical reproduction
+
+The default scorer profile is `identity-reason/v2`. Fixture metadata cannot
+select a weaker profile. Strict sets include `evaluation_profile` and an
+`expected.aps_reason` for every case. Their package digest is SHA-256 over
+RFC 8785 JCS of the entire manifest **without** `package_digest`, including
+case hashes, expectations, trust keys, source, profile and supersession.
+The historical package rule (sorted file/hash lines) is retained only for
+unchanged older sets. Reports also record the manifest's raw SHA-256.
+
+The stand-in codes are `scope_covered`, `widened`, `expired`, `out_of_scope`.
+They do not prescribe APS's implementation-specific codes: APS supplies its
+own exact expected codes with its next submission. The stand-in's identity
+is its signed-chain wrapper's `delegation_id`; APS's is its leaf ID. Only
+its verifier understands that distinction.
+
+Historical `t1`, `t2`, `aps-1`, and previously published results remain
+unchanged. To reproduce their original verdict-only evaluation, explicitly
+add `--legacy-verdict-only` (Python API: `legacy_verdict_only=True`):
+
+```bash
+python -m runner.authority_harness --fixtures federation/authority/fixtures/t2 \
+  --verifier federation/authority/template-verifier --out /tmp/authority-t2-legacy \
+  --legacy-verdict-only
+```
+
+JSON and Markdown then say `profile: legacy-verdict-only`, identity/reasons
+not scored, and legacy PASS does not establish the complete contract. Never
+use this option as evidence that leaf binding or refusal reasons work.
+Older fixture sets fail strict evaluation rather than silently downgrading.
+
+**APS migration remains an external delivery/review step.** The pinned
+`aps-1` image and submission predate this strict profile. Keep them intact;
+APS must publish an updated digest-pinned verifier returning the ID it
+extracts, register its reason codes in a new strict submission, and review
+the new offline results. No testbed-side APS parser or third-party verifier
+source is added. This change does not assert APS has accepted a new field
+name or final contract. Runtime ToolSpec/work-order binding, revocation,
+clock/lease integration, and inline A/B/C remain separate future work.

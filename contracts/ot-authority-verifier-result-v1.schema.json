@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/darklordVirtual/autonomous-ot-control/contracts/ot-authority-verifier-result-v1.schema.json",
   "title": "ot-authority-verifier-result/v1",
-  "description": "What a delegation verifier writes for runner.authority_harness: one answer per case, pass or refuse, with a reason. Anything else is recorded as malformed, never as a refusal.",
+  "description": "Delegation verifier response. Strict scoring requires a machine-readable reason and verifier-derived delegation_id for pass/refuse. Indeterminate is separate from malformed and never a refusal or an admission.",
   "type": "object",
   "required": [
     "verdicts"
@@ -29,11 +29,21 @@
           "verdict": {
             "enum": [
               "pass",
-              "refuse"
+              "refuse",
+              "indeterminate"
             ]
           },
           "reason": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
+          },
+          "delegation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Identity extracted by the verifier from the complete supplied delegation; for APS, the leaf id. Null when identity cannot be determined. Never copied from the work order."
           }
         }
       }
