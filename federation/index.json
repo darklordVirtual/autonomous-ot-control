@@ -33,7 +33,9 @@
     "authority_harness": "runner/authority_harness.py",
     "authority_submission_schema": "contracts/ot-authority-submission-v1.schema.json",
     "authority_fixtures_schema": "contracts/ot-authority-fixtures-v1.schema.json",
-    "authority_verifier_result_schema": "contracts/ot-authority-verifier-result-v1.schema.json"
+    "authority_verifier_result_schema": "contracts/ot-authority-verifier-result-v1.schema.json",
+    "authority_fixtures_aps_1": "federation/authority/fixtures/aps-1/manifest.json",
+    "authority_aps_report": "docs/results/2026-10-28/aps-authority.md"
   },
   "produces": [
     "decision_trail (proposal, REMORA decision, envelope, evidence bundle)",
@@ -86,7 +88,7 @@
       "mode": "inline",
       "status": "SPECIFIED",
       "scoring": "none",
-      "note": "Contract proposed with APS in docs/federation/authority-fixture-contract.md (issue #27): the normalized call (ot-normalized-call/v1), the signed work order (ot-work-order/v1), RFC 8785 JCS binding of the delegation, test-only Ed25519 keys (runner/jcs.py, runner/work_order.py). Offline harness runner/authority_harness.py runs a verifier and the work-order check on the same input, records both verdicts, keeps errors and timeouts apart, and checks the oracle's delegation_invalid rule against the manifest. The five cases are sealed in federation/authority/fixtures/t2 (t1, sealed with CRLF, is kept and superseded) with a stand-in delegation format and verifier (not APS's), to be replaced by APS's. APS submits delegations (ot-authority-submission/v1); the testbed signs the work orders and seals the set (runner.authority_fixtures assemble). Shadow evaluation (runner.demo --shadow-edge) and run pins are in place; inline integration waits for APS's review of the offline results."
+      "note": "Offline harness implemented and APS PR #35 reproduced: sealed federation/authority/fixtures/aps-1, delegation 5/5, work-order 5/5, oracle 5/5. See docs/results/2026-10-28/aps-authority.md for source, image digest, run revisions and limits. Revocation is untested. The t1/t2 stand-in sets remain historical fixtures. The mode/status fields describe the planned inline boundary: APS is not yet consulted inline in A/B/C; integration waits for APS review of offline results. Errors, timeouts and malformed answers are not refusals. No result authorizes live control."
     }
   ],
   "registered_edges": {
