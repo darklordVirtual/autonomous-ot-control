@@ -4,34 +4,45 @@
 
 ## Proposed public post (English)
 
-**Can an AI agent have valid delegated authority and still be refused permission to change a building? It should.**
+> **Audience-first draft:** Names are defined in plain language before the technical experiment. Credits describe different work without implying a single joint implementation. GitHub @handles are placeholders for human-verified LinkedIn tags.
 
-That's the boundary we've been testing publicly with two independent projects: **Agent Passport System (APS)** and the **REMORA-governed autonomous-ot-control testbed**.
+**Would you let AI adjust the heating in your office building?**
 
-**The people behind this specific experiment:**
-- **@aeoess / APS:** proposed the delegation boundary and supplied five signed synthetic delegation chains plus a verifier distributed as a digest-pinned container (PR #35).
-- **@darklordVirtual / REMORA testbed:** built the separate signed work-order checks, offline harness and pre-registered expected-outcome oracle (PR #29), reproduced the submitted verifier in the testbed's Docker sandbox, and reviewed the integration before merge.
+AI could help buildings use less energy, respond faster to problems and reduce operating costs. But before it changes a temperature or starts equipment, we need answers to three questions:
 
-The recorded **aps-1 offline run** matched all five expected delegation, work-order and oracle outcomes. **One** synthetic operation was admitted; **four** were refused. A widened delegation, expired delegation and out-of-scope operation were rejected by APS. Another request had valid delegation but exceeded the work-order setpoint range, so the **local work-order check** refused it.
+**Who gave the AI permission? Is this specific change allowed? How can we check what happened?**
 
-A reviewer found a verifier/manifest identity mismatch. APS fixed it **before PR #35 merged**. Public review improved the integration.
+Two independent open-source projects are exploring different parts of that challenge:
 
-**Credit beyond this APS experiment:** @astrogilda (Probity AI's separate effect-evidence edge), @giskard09 (an external reference-verifier reproduction), @altrudev (independent runner-failure tests) and @Tetsurohhori (reader and mutation evaluations) have tested **other** boundaries of this same OT testbed. Those contributions are not presented as tests of APS itself.
+**Agent Passport System (APS)**, led by **@aeoess**, verifies digitally signed *delegated authority*: who gave an AI agent permission, which operations it covers and when it expires.
 
-The separate **Agent Governance Vocabulary** work credits co-authors @QueBallSharken, @douglasborthwick-crypto, @MoltyCel and others.
+**REMORA**, led by **@darklordVirtual**, is a governance platform for AI-initiated actions, designed to apply signed rules, limits and approvals and preserve auditable evidence of decisions and outcomes.
 
-**What this does *not* establish:** live building control, production safety, revocation coverage, complete runtime mediation, or proof that adding APS provides incremental protection beyond REMORA. These are synthetic, offline, bounded tests. The testbed's reproduction executes the APS-authored verifier; it is not an independently implemented APS verifier.
+Our **building automation testbed** is a simulated building where these ideas can be tested safely, without controlling real heating or ventilation equipment.
 
-**Independent projects. Shared boundaries. Verifiable evidence.**
+**What did we test together?**
 
-We welcome independent reviewers, developers and potential pilot partners to examine the evidence.
+APS supplied signed delegation examples and its own verifier. The testbed checked a separate signed *work order*: whether the requested building change and value were locally allowed.
 
-**Check the result, not just the claim:**
-- APS contribution: https://github.com/darklordVirtual/autonomous-ot-control/pull/35
-- Reproduced aps-1 result: https://github.com/darklordVirtual/autonomous-ot-control/blob/main/docs/results/2026-10-28/aps-authority.md
-- Federation discussion: https://github.com/aeoess/agent-governance-vocabulary/issues/177
+We ran **five synthetic scenarios**. All five matched the expected results: **one simulated action admitted, four refused**.
 
-#AgenticAI #AIGovernance #OpenSource #Interoperability #REMORA #BuildingAutomation
+The revealing case? An AI agent had **valid delegated permission**, but requested a temperature outside the approved work-order range. **APS accepted the delegation; the local work-order check refused the change.** Permission to act is not permission to do anything.
+
+Public review also caught a mismatch in the verifier's identity metadata, which APS corrected before the contribution was merged.
+
+**Credit where it's due:** @aeoess contributed the APS fixtures and verifier; @darklordVirtual contributed the OT test harness and local authorization checks. Other contributors — **@astrogilda, @giskard09, @altrudev and @Tetsurohhori** — have independently examined *different* evidence and test-runner boundaries in this testbed. Their work is distinct from the APS experiment.
+
+The broader **Agent Governance Vocabulary** collaboration also credits **@QueBallSharken, @douglasborthwick-crypto, @MoltyCel** and many other contributors for shared terminology and mappings.
+
+**The limits matter:** These are offline tests with synthetic data, **not** real building control. APS was not yet integrated into live REMORA decision-making, and we have not established that adding APS provides extra protection compared with REMORA alone.
+
+We welcome engineers, independent reviewers and potential pilot partners who want to explore how trustworthy AI could work in real operations.
+
+**See the evidence:**
+https://github.com/darklordVirtual/autonomous-ot-control/pull/35
+https://github.com/darklordVirtual/autonomous-ot-control/blob/main/docs/results/2026-10-28/aps-authority.md
+
+#AgenticAI #AIGovernance #OpenSource #BuildingAutomation #REMORA
 
 ---
 
