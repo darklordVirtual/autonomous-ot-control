@@ -17,25 +17,73 @@ repository.
 |---|---|
 | **See results** of outside runs against the testbed | [`docs/federation/RESULTS.md`](docs/federation/RESULTS.md) (generated from run records; reviewed reports below the table) |
 | **Join** with my own check, no credentials, five minutes | [Join as a federation edge](#join-as-a-federation-edge) and the [guide](docs/federation/README.md) |
-| **Read the reports** | Federation A/B/C, five arms, every oracle rule attacked: [abc-gate](docs/results/2026-10-28/abc-gate.md) (current) · [abc-full](docs/results/2026-10-28/abc-full.md) and [what it found](docs/results/2026-10-28/abc-full-analysis.md) · strategy A/B/C with seeded faults: [abc-2025.html](docs/results/2026-10-27/abc-2025.html) · five price areas 2025: [areas-2025.html](docs/results/2026-10-27/areas-2025.html) · governed week: [report.html](docs/results/2026-10-27/report.html) |
+| **Read the reports** | Federation A/B/C, five arms, every oracle rule attacked: [abc-gate](docs/results/2026-10-28/abc-gate.md) (run at `3ea8b12`; attribution caveat below) · [abc-full](docs/results/2026-10-28/abc-full.md) and [what it found](docs/results/2026-10-28/abc-full-analysis.md) · strategy A/B/C with seeded faults: [abc-2025.html](docs/results/2026-10-27/abc-2025.html) · five price areas 2025: [areas-2025.html](docs/results/2026-10-27/areas-2025.html) · governed week: [report.html](docs/results/2026-10-27/report.html) |
 | **Check the security work** | [SDD-OT-002 status](docs/security/sdd-ot-002-status.md) (25 findings, per work package) · [OWASP Agentic Top 10](docs/security/owasp-agentic-top10.md) · [adversarial benchmark](docs/security/adversarial-benchmark.md) |
 | **Check what is established**, and at what evidence level | [`docs/status.md`](docs/status.md) |
 | **Find the entry point for machines** | [`federation/index.json`](federation/index.json) |
 
+## Try it in five minutes: offline evidence check
+
+Requires Git, Python 3.11+ and Bash (Linux, macOS or WSL). This first check
+uses only Python's standard library: no Docker, credentials or REMORA build.
+
+```bash
+git clone https://github.com/darklordVirtual/autonomous-ot-control.git
+cd autonomous-ot-control
+python3 -m runner.edge_check --init my-first-check --project "My first check" --maintainer YOUR_GITHUB_HANDLE
+./deploy/scripts/run-edge.sh my-first-check --local
+```
+
+Expected: **PASS**, 12/12 positive cases established and 10/10 negative
+controls caught on sealed set `v2`. The command prints the report and writes
+`artifacts/edges/my-first-check/<timestamp>/`. This runs a copy of our reference
+verifier; it is a self-test, not an independent implementation or a building
+simulation. `--local` executes the named adapter on your host; use it only
+for code you trust. The [contributor guide](docs/federation/README.md) explains
+how to replace the reference with your own check and run it in a sandbox.
+
+### Run the simulated building
+
+With Docker Compose v2 installed, from the checkout above:
+
+```bash
+./deploy/scripts/run-demo.sh        # simulator smoke tests and baseline
+./deploy/scripts/run-governed.sh    # REMORA-governed acceptance suite
+```
+
+The governed path builds the pinned REMORA and needs network access to its
+source and image/package registries. Both commands export evidence to
+`artifacts/` and stop their stacks when finished. Installation for the Python
+tests and longer experiments: [running guide](docs/running.md).
+
+## One concrete case
+
+A caretaker asks to change ZONE-01 to **20.5 °C**. A signed work order permits
+19–21 °C, but REMORA's contract, cumulative limits and review must also allow
+the call before the dispatcher can apply it. The observer then checks the
+recorded operation and resulting value. A request for **22.5 °C** must be
+refused by the work-order check even when its delegation chain is valid.
+See the [five published APS authority cases](docs/results/2026-10-28/aps-authority.md):
+they exercise offline delegation and work-order checks, not live actuation.
+
 ## How it works
 
+```mermaid
+flowchart TD
+    Agent["Caretaker proposes a call"] --> Remora["REMORA checks contract and limits"]
+    Orders["Authority signs work orders"] --> Remora
+    Remora --> Review["Reviewer checks the bound request"]
+    Review --> Gate["Dispatcher checks work order"]
+    Orders --> Gate
+    Gate --> Twin["Simulated building and interlocks"]
+    Twin --> Observer["Read-only observer checks effect"]
+    Remora --> Evidence["Recorded evidence for external checks"]
+    Observer --> Evidence
 ```
- work-order authority ── signs the day plans (Ed25519) ──▶ intent table
-                                                              │
- caretaker / agent        REMORA                  reviewer      │      dispatcher (adapter)        twin             observer
- proposes one     ───▶    signed ToolSpec v5,  ───▶ approver ───┼──▶   work-order gate:      ───▶  interlocks  ───▶ read-only,
- governed call            signed limits,           token only,  │      signed, valid today,        IL-01..IL-11,    own token,
- (operator token)         single-use ids,          decides from │      permits this value;         single-use       records the
-                          audit chain              REMORA's own │      holds the actuator          operation ids    effect
-                                                   record ──────┘      credential, exactly once
-        │                                                                                                              │
-        └────────────────────────── evidence: decision, envelope, twin operation record, observation ──────────────────┘
-```
+
+Checks may refuse a request before it reaches the plant. The diagram shows
+the governed path; the intentionally ungoverned A/B/C arm is a separate
+negative control. Process credentials and network boundaries are below.
 
 | Process | Holds | Cannot |
 |---|---|---|
@@ -47,7 +95,7 @@ repository.
 | Twin | its interlocks | — (it is the simulated plant) |
 
 <details>
-<summary>The four properties the suite proves, and where</summary>
+<summary>Four properties exercised by the test suite</summary>
 
 - **Ten supervisory write tools**, all governed, each with declared bounds,
   target and postconditions ([`contracts/ot-toolspec-v1.json`](contracts/ot-toolspec-v1.json),
@@ -57,7 +105,7 @@ repository.
   ([trust boundary](docs/running.md#trust-boundary)).
 - **Refusals are the product.** Replay, tampering, out-of-contract calls,
   budget overruns, interlocks, a stopped plant and a database outage all end
-  with no effect, and the suite proves it ([status](docs/status.md)).
+  with no effect, in the tested cases ([status](docs/status.md)).
 - **Real inputs, synthetic plant.** Verified 2025 Nord Pool prices and ERA5
   weather for all five Norwegian price areas drive a deterministic 3-zone
   twin, with Statsbygg PA 0802 (TFM) naming for every data point
@@ -97,7 +145,7 @@ aeoess/agent-governance-vocabulary#177, the discussion that motivated this.
 | `runner_validity` | offline | Does the scorer report a failing verifier as a failure, never a pass? | open, report reviewed |
 | `admission_runtime` | inline | `permit` or `refuse` before dispatch, with a reason; consulted only after REMORA and the reviewer approved, can only add refusals | open: harness in the governed demo (`--inline-edge`), reference edge `federation/edges/_inline_template`, scored in the A/B/C report |
 | `tool_definition` | inline | Does the served tool definition match the approved one? | no harness yet. Planned next, against the signed ToolSpec bundle REMORA pins by digest (no MCP gateway needed): the harness hands the edge the served definition and the pinned digest per call, same shape as AgentAvow's `tool_manifest_digest` (E8) |
-| `authority_fixture` | inline | What does a synthetic signed work order authorize? | contract and fixtures pinned ([authority-fixture contract](docs/federation/authority-fixture-contract.md), issue #27); the testbed's own work orders are now Ed25519-signed artifacts, enforced at the dispatcher (SDD-OT-002 SR-05). First external edge: APS's delegation verifier (PR #35), 5/5 on the sealed set `aps-1`, [reproduced here](docs/results/2026-10-28/aps-authority.md) |
+| `authority_fixture` | offline today; inline planned | What does a synthetic signed work order authorize? | contract and fixtures pinned ([authority-fixture contract](docs/federation/authority-fixture-contract.md), issue #27); the testbed's own work orders are now Ed25519-signed artifacts, enforced at the dispatcher (SDD-OT-002 SR-05). First external edge: APS's delegation verifier (PR #35), 5/5 on the sealed set `aps-1`, [reproduced here](docs/results/2026-10-28/aps-authority.md) |
 
 </details>
 
@@ -161,6 +209,12 @@ on unmeasured assumptions of the twin and is not the figure to quote. Each
 report opens with what drives the number. Tables, definitions of P0–P3 and the
 arms, and the reports: [`docs/strategies.md`](docs/strategies.md).
 
+**Calibration status:** energy-certificate cohorts provide priors, and one
+measured office has an in-sample monthly consistency check. The same period
+was used for fitting and evaluation; hourly errors remain high and no held-out
+validation or causal saving has been established. See [calibration](docs/calibration.md).
+The percentages above describe the synthetic demo building, not that office.
+
 Everything in the governed path is `TESTED_DOCKER`: one host, one REMORA
 replica, synthetic plant, same-deployment vantage. Real-building savings and
 physical OT safety are `NOT_ESTABLISHED`. The full capability table with the
@@ -201,6 +255,12 @@ model, arm C adds one inline edge that can only add refusals.
 | B-rubber_stamp: REMORA and the work-order gate, a reviewer that approves everything | 1 | 45 |
 | B-independent: a reviewer in its own container, deciding from REMORA's record | 0 | 45 |
 | C-rubber_stamp: B-rubber_stamp plus the reference inline edge | 0 | 45 |
+
+These are historical counts from commit `3ea8b12`, not a fresh run of this
+checkout. Two C-arm refusals were credited to the edge although the reviewer
+stopped them; later code fixes the attribution. The report states that effect
+counts are unchanged, but corrected layer counts need a new full run before
+being used in launch material. See the [launch checklist](docs/launch-readiness.md).
 
 From [abc-gate](docs/results/2026-10-28/abc-gate.md); the run before the weak
 points were closed, and what each layer and edge stopped, is in
