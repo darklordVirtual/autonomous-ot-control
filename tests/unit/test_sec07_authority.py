@@ -167,7 +167,7 @@ def test_unsigned_tables_are_labelled_intent_table_not_signed_work_order():
 
 def test_the_full_episode_adds_the_two_attacks_on_authority():
     from runner import arm_a, episode, ledger_metrics as lm
-    path = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-full-v1.json"
+    path = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-full-v2.json"
     assert episode.check(path) == []
     ep = episode.load(path)
     by_origin = {p["origin"]: p["oracle"]["rule"] for p in ep["proposals"] if p["origin"].startswith("injected:")}

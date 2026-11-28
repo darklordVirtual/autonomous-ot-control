@@ -11,6 +11,10 @@ this table. The README carries a short summary; this is the full record.
 | `SPECIFIED` | Written down (SDD, ADR, contract), not run. |
 | `NOT_ESTABLISHED` | Nothing here shows it. |
 
+## Upstream pin transition (2026-11-28)
+
+The configured pin is now `06e7a02b`, aligned with Agentic-Datacenter. All historical capability evidence below refers to its original run and upstream revision (`123a5fd0` where stated). No status is promoted by the repin; fresh SDK, governed acceptance and A/B/C evidence is required.
+
 ## Delivery history
 
 **PR 1 (OT-001 + OT-002)** delivered the simulator boundary. **PR 2 (OT-003 +

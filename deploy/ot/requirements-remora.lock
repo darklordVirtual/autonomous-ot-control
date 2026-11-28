@@ -1,7 +1,8 @@
 # Hash-locked install set of the REMORA image (SDD-OT-002 SR-21, F-04). To regenerate:
 #   git -C <REMORA clone> show <commit below>:pyproject.toml > /tmp/remora/pyproject.toml
 #   uv pip compile /tmp/remora/pyproject.toml deploy/ot/requirements-remora.in --extra api --extra postgres --extra security --python-version 3.12 --python-platform x86_64-unknown-linux-gnu --generate-hashes --no-header -o deploy/ot/requirements-remora.lock
-# REMORA commit: 123a5fd033bd1192fad05d366ec5263eb66c17b7
+# REMORA commit: 06e7a02b49563b4cbbfec1e573cde026462c3240
+# Existing hash-locked resolution retained: upstream build-system, base dependencies and api/postgres/security extra declarations match the previous pin. Runtime compatibility still requires CI.
 annotated-doc==0.0.5 \
     --hash=sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101 \
     --hash=sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb

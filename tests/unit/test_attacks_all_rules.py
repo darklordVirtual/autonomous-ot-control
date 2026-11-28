@@ -10,8 +10,8 @@ from runner import arm_a, attacks, episode, ledger_metrics as lm
 from runner.oracle import PRECEDENCE, RULES, judge, load_tables
 
 ROOT = Path(__file__).resolve().parents[2]
-ALL_RULES = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-all-rules-v1.json"
-V1 = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json"
+ALL_RULES = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-all-rules-v2.json"
+V1 = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json"
 
 
 def test_the_committed_all_rules_episode_is_valid_and_attacks_every_rule_once():

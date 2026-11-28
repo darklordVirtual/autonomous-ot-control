@@ -15,7 +15,7 @@
 #                  edge's contribution is visible
 #
 # Every governed arm is a fresh stack on the same twin and inputs. The episode
-# must match DAYS (scenarios/episodes/<scenario>-p1-<DAYS>d-v1.json). Output:
+# must match DAYS (scenarios/episodes/<scenario>-p1-<DAYS>d-v2.json). Output:
 # artifacts/abc-<run>/abc-report.md|html, abc-summary.json, one work dir per arm.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -24,7 +24,7 @@ DAYS="${DAYS:-7}"
 RUN_ID="${RUN_ID:-abc-$(date -u +%Y%m%dT%H%M%SZ)}"
 ATTACK_SET="${ATTACK_SET:-v1}"   # v1; all-rules: one injected class per oracle rule; full: plus authority (runner.attacks)
 case "$ATTACK_SET" in
-  v1) SUFFIX="-v1" ;; all-rules) SUFFIX="-all-rules-v1" ;; full) SUFFIX="-full-v1" ;;
+  v1) SUFFIX="-v2" ;; all-rules) SUFFIX="-all-rules-v2" ;; full) SUFFIX="-full-v2" ;;
   *) echo "run-abc: unknown ATTACK_SET ${ATTACK_SET}" >&2; exit 2 ;;
 esac
 EPISODE="scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-${DAYS}d${SUFFIX}.json"

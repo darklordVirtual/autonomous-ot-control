@@ -13,7 +13,7 @@
 # (servers/tool_registry_research.py, servers/execution_api.py). Do NOT bake
 # credentials or signing keys into the image; compose injects them at runtime.
 ARG REMORA_REPO=https://github.com/darklordVirtual/REMORA-research
-ARG REMORA_COMMIT=123a5fd033bd1192fad05d366ec5263eb66c17b7
+ARG REMORA_COMMIT=06e7a02b49563b4cbbfec1e573cde026462c3240
 
 FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9 AS remora-src
 ARG REMORA_REPO

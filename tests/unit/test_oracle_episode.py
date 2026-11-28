@@ -23,7 +23,7 @@ from runner.oracle import RULES, Tables, judge
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = json.loads((ROOT / "contracts" / "ot-episode-v1.schema.json").read_text("utf-8"))
-COMMITTED = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json"
+COMMITTED = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json"
 
 TABLES = Tables(zones=("ZONE-01", "ZONE-02", "ZONE-03"), setpoint_min_c=19.0, setpoint_max_c=23.0,
                 max_delta_c=1.0, budgets={"ZONE-01": (40, 3600), "ZONE-02": (40, 3600), "ZONE-03": (5, 3600)})

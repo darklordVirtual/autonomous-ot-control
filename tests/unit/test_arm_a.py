@@ -15,7 +15,7 @@ from pathlib import Path
 from runner import arm_a, episode, ledger_metrics as lm
 
 ROOT = Path(__file__).resolve().parents[2]
-EP = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json"
+EP = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json"
 
 
 def test_arm_a_applies_what_the_interlock_lets_through_and_is_accounted_against_the_oracle(tmp_path):
