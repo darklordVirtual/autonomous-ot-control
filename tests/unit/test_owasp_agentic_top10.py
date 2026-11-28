@@ -343,7 +343,7 @@ def test_asi06_a_changed_sealed_set_or_episode_pin_is_detected(tmp_path):
     p = s / "cases" / "af-1-valid.json"
     p.write_bytes(p.read_bytes().replace(b'"value": 20.5', b'"value": 21.5'))
     assert "changed cases/af-1-valid.json" in af.check(s)
-    ep = episode.load(ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json")
+    ep = episode.load(ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json")
     ep["pins"]["oracle_sha256"] = "0" * 64
     e = tmp_path / "ep.json"
     e.write_text(json.dumps(ep), "utf-8")

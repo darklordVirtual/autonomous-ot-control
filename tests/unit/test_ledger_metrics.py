@@ -73,7 +73,7 @@ def test_attach_and_metrics_against_the_episode():
 def test_demo_accounts_arm_b_against_the_committed_episode(tmp_path):
     """runner.demo.account_arm_b: the committed 7-day episode supplies the oracle; P3 runs are accounted unjudged."""
     from runner import demo
-    ep = episode.load(episode.EPISODES_DIR / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json")
+    ep = episode.load(episode.EPISODES_DIR / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json")
     sched = [p for p in ep["proposals"] if p["origin"] == "schedule"][:5]
     ledger = [_row(p["at_sim_s"], p["call"]["arguments"]["zone_id"], p["call"]["arguments"]["setpoint_c"],
                    applied=True, reviewer={"approved": True}) for p in sched]

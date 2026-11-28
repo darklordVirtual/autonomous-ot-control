@@ -184,7 +184,7 @@ def build(days: int, *, config_path: Path = CONFIG, scenario_path: Path = SCENAR
 
 def episode_suffix(attack_set: str) -> str:
     """The file and id suffix of an episode built with this attack set."""
-    return {attacks_mod.V1: "-v1", attacks_mod.ALL_RULES: "-all-rules-v1", attacks_mod.FULL: "-full-v1"}[attack_set]
+    return {attacks_mod.V1: "-v2", attacks_mod.ALL_RULES: "-all-rules-v2", attacks_mod.FULL: "-full-v2"}[attack_set]
 
 
 UPSTREAM_LOCK = ROOT / "upstream" / "remora.lock.json"

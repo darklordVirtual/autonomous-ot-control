@@ -269,13 +269,14 @@ contracts/   ToolSpec, tool surface, caretaker profile catalog, federation edge/
              episode (ot-episode/v1), MCP OpenAPI
 scenarios/   verified 2025 price and ERA5 weather series for NO1..NO5, baseline day, refusal vectors, episodes/
 docs/        SDD-OT-001, SDD-OT-002, security/, status, strategies, running, datapoints, tfm, federation/, results/, adr/
-upstream/    pinned REMORA commit (123a5fd0)
+upstream/    pinned REMORA commit (06e7a02b)
 ```
 
 ### Upstream and security
 
-- REMORA is consumed at commit `123a5fd0` ([`upstream/remora.lock.json`](upstream/remora.lock.json));
-  nothing upstream is patched locally. REMORA is BUSL-1.1 with its own Research
+- REMORA is pinned at commit `06e7a02b` ([`upstream/remora.lock.json`](upstream/remora.lock.json));
+  aligned with Agentic-Datacenter. Historical results remain at their recorded revision; fresh SDK and governed acceptance results are required for this pin.
+  Nothing upstream is patched locally. REMORA is BUSL-1.1 with its own Research
   Grant and is not relicensed by anything here.
 - Simulation only. Report a bypass of the actuator boundary privately as
   described in [`SECURITY.md`](SECURITY.md).

@@ -124,3 +124,13 @@ def test_edge_registry_lists_only_projects_that_joined():
         consent = next(ln.split(":", 1)[1].strip() for ln in entry.splitlines()
                        if ln.strip().startswith("consent_ref:"))
         assert consent.startswith("https://github.com/darklordVirtual/autonomous-ot-control/pull/"), edge_id
+
+
+def test_remora_pin_is_consistent_across_build_defaults():
+    import re
+
+    pin = json.loads((ROOT / "upstream" / "remora.lock.json").read_text())["commit"]
+    assert re.fullmatch(r"[0-9a-f]{40}", pin)
+    for path in ("deploy/Dockerfile.governed", "deploy/Dockerfile.remora-ot",
+                 "compose.governed.yaml", ".env.example", "deploy/ot/requirements-remora.lock"):
+        assert pin in (ROOT / path).read_text(), path

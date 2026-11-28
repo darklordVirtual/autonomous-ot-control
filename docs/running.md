@@ -63,9 +63,9 @@ Guide: [federation/README.md](federation/README.md).
 ## Federation A/B/C on one episode (ADR-004)
 
 ```bash
-python -m runner.episode check scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v1.json
+python -m runner.episode check scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v2.json
 DAYS=7 ./deploy/scripts/run-abc.sh                      # Docker: A offline, B-careful, B-rubber_stamp, C-rubber_stamp, report
-python -m runner.ab_compare --episode scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v1.json \
+python -m runner.ab_compare --episode scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v2.json \
     --out artifacts/abc-local --run-arm-a               # no Docker: arm A only, the report says B and C did not run
 ```
 
@@ -118,8 +118,9 @@ table: [README](../README.md#how-it-works).
 
 ## Upstream pin
 
-REMORA is consumed at commit `123a5fd0` (REMORA-research#1099 included),
-recorded in [`upstream/remora.lock.json`](../upstream/remora.lock.json) and
+REMORA is pinned at commit `06e7a02b` (aligned with Agentic-Datacenter),
+with validation pending on this revision. Historical results use `123a5fd0`.
+The pin is recorded in [`upstream/remora.lock.json`](../upstream/remora.lock.json) and
 built into `deploy/Dockerfile.remora-ot` and `deploy/Dockerfile.governed`;
 `remora.sdk` is installed from that same checkout. Override with
 `REMORA_COMMIT` in `compose.governed.yaml` only together with a new acceptance

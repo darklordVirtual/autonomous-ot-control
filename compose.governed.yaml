@@ -31,7 +31,7 @@ x-hardening: &hardening
 
 x-remora-build: &remora-build-args
   REMORA_REPO: ${REMORA_REPO:-https://github.com/darklordVirtual/REMORA-research}
-  REMORA_COMMIT: ${REMORA_COMMIT:-123a5fd033bd1192fad05d366ec5263eb66c17b7}
+  REMORA_COMMIT: ${REMORA_COMMIT:-06e7a02b49563b4cbbfec1e573cde026462c3240}
 
 services:
   postgres:

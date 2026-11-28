@@ -2,7 +2,7 @@
 
 This records the seams between `autonomous-ot-control` and the pinned REMORA
 upstream, reconciled against the real source (first at `2594d08b`, re-checked
-at `9b1763ca`, now pinned at `123a5fd0`, see `upstream/remora.lock.json`), and
+at `9b1763ca`, historically validated at `123a5fd0`; current pin `06e7a02b` pending regression validation, see `upstream/remora.lock.json`), and
 the custody/fencing boundary. Since OT-005 slice 1 the governed
 path runs end to end in Docker; the acceptance results are in the README and in
 each run's `artifacts/<run-id>/` evidence bundle. See

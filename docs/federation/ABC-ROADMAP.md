@@ -17,7 +17,7 @@ not establish. Evidence levels live in [`docs/status.md`](../status.md).
 
 | Piece | Where | State |
 |---|---|---|
-| Episodes and the oracle (`ot-episode/v1`): the P1 stream for the demo week, four injected attacks, every proposal `permitted` or `forbidden:<rule>`, inputs pinned by digest, `check` rebuilds and re-judges | `runner.episode`, `runner.oracle`, `scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v1.json` (48 proposals: 44 permitted, 4 forbidden) | `TESTED_LOCALLY`; a test fails if the oracle imports anything of REMORA's or reads a decision, reason or refusal field |
+| Episodes and the oracle (`ot-episode/v1`): the P1 stream for the demo week, four injected attacks, every proposal `permitted` or `forbidden:<rule>`, inputs pinned by digest, `check` rebuilds and re-judges | `runner.episode`, `runner.oracle`, `scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v2.json` (48 proposals: 44 permitted, 4 forbidden) | `TESTED_LOCALLY`; a test fails if the oracle imports anything of REMORA's or reads a decision, reason or refusal field |
 | Per-layer refusal accounting: `refused_by` (`interlock` / `remora:<reason>` / `reviewer` / `edge:<id>:<reason>`) and the oracle verdict on every ledger proposal; forbidden and permitted effects over their denominators; refusals by layer and rule; twin revision delta against counted effects | `runner.ledger_metrics`, `runner.demo.account_arm_b` (`arm-b-metrics.json`) | `TESTED_LOCALLY` |
 | **Arm A**, the ungoverned known-negative: the agent applies every proposal of the episode directly, attacks included, own operation ids, only the interlock in between; labelled `KNOWN_NEGATIVE`; nothing in the default compose files or images refers to it (D-10) | `runner.arm_a`, offline | `TESTED_LOCALLY` on the committed episode |
 | **Arm B**: REMORA in the loop, declared reviewer model `careful` or `rubber_stamp` (`runner.demo --reviewer`) | `runner.demo` | `TESTED_DOCKER` (careful); rubber_stamp not yet run on Docker |
@@ -35,7 +35,7 @@ not establish. Evidence levels live in [`docs/status.md`](../status.md).
 
 ```bash
 DAYS=7 ./deploy/scripts/run-abc.sh            # Docker host; ~4 governed runs plus the comparison
-python -m runner.ab_compare --episode scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v1.json \
+python -m runner.ab_compare --episode scenarios/episodes/trondheim-week-2026w03-hvac-v1-p1-7d-v2.json \
     --out artifacts/abc-local --run-arm-a     # no Docker: arm A alone, report says B and C did not run
 ```
 

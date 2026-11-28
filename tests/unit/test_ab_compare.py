@@ -17,7 +17,7 @@ from runner import ab_compare, demo, episode
 from runner.federation_fixtures import canonical_sha256
 
 ROOT = Path(__file__).resolve().parents[2]
-EP = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v1.json"
+EP = ROOT / "scenarios" / "episodes" / "trondheim-week-2026w03-hvac-v1-p1-7d-v2.json"
 
 
 def _row(p, *, applied, **k):
